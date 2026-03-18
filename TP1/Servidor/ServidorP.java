@@ -1,50 +1,53 @@
-package server;
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintStream;
-import java.net.ServerSocket;
-import java.net.Socket;
-import java.util.ArrayList;
-import java.util.Collections;
-/**
- * @see http://www.jc-mouse.net/
- * @author mouse
- */
-public class MainServer {
- 
-    /**
-     * Puerto 
-     */
-    private final static int PORT = 5000;
+import java.io.*;
+import java.net.*;
+import java.util.logging.*;
+
+public class ServidorP extends Thread{
+
+    private ServerSocket socket;
+    private DataOutputStream dos;
+    private DataInputStream dis;
+    private int idSessio;
+    private int puerto;
     
-    /**
-     * @param args the command line arguments
-     */
-    public static void main(String[] args) {
+    public ServidorP(ServerSocket socket, int puerto) {
+        this.socket = socket;
+        this.puerto = puerto;
         
         try {
-            //Socket de servidor para esperar peticiones de la red
-            ServerSocket serverSocket = new ServerSocket(PORT);
-            System.out.println("Servidor> Servidor iniciado");    
-            System.out.println("Servidor> En espera de cliente...");    
+            dos = new DataOutputStream(socket.getOutputStream());
+            dis = new DataInputStream(socket.getInputStream());
+        } catch (IOException ex) {
+            Logger.getLogger(ServidorHilo.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }
+    
+    @Override
+    public void run() {
+        
+        try {
+            System.out.println("ServidorHoroscopo> Servidor iniciado");    
+            System.out.println("ServidorHoroscopo> En espera de cliente...");    
             //Socket de cliente
             Socket clientSocket;
             while(true){
                 //en espera de conexion, si existe la acepta
-                clientSocket = serverSocket.accept();
+                clientSocket = socket.accept();
                 //Para leer lo que envie el cliente
                 BufferedReader input = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
                 //para imprimir datos de salida                
                 PrintStream output = new PrintStream(clientSocket.getOutputStream());
                 //se lee peticion del cliente
                 String request = input.readLine();
-                System.out.println("Cliente> petición [" + request +  "]");
+                System.out.println("Cliente(id)> petición [" + request +  "]");
                 //se procesa la peticion y se espera resultado
-                String strOutput = process(request);                
+                
+                //HACER LO DEL SERVERCACHE
+                String strOutput = process(request);
+
                 //Se imprime en consola "servidor"
-                System.out.println("Servidor> Resultado de petición");                    
-                System.out.println("Servidor> \"" + strOutput + "\"");
+                System.out.println("ServidorHoroscopo> Resultado de petición");                    
+                System.out.println("ServidorHoroscopo> \"" + strOutput + "\"");
                 //se imprime en cliente
                 output.flush();//vacia contenido
                 output.println(strOutput);                
@@ -55,6 +58,17 @@ public class MainServer {
             System.err.println(ex.getMessage());
         }
     }
+
+    
+    public void desconnectar() {
+        try {
+            socket.close();
+        } catch (IOException ex) {
+            Logger.getLogger(ServidorHilo.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }
+    
+
     
     /**
      * procesa peticion del cliente y retorna resultado
@@ -92,7 +106,6 @@ public class MainServer {
                 if (request.equals("frase")) {t=1;}
                 if (request.equals("libro")) t=2; 
                 if (request.equals("exit")) t=3;  
-        System.out.println("t -> [" + t +  "]");
         switch(t){
             case 1:
                 Collections.shuffle(phrasesList);

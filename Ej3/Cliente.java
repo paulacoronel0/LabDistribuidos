@@ -17,7 +17,7 @@ class Persona extends Thread {
             dos = new DataOutputStream(sk.getOutputStream());
             dis = new DataInputStream(sk.getInputStream());
             System.out.println(id + " envía saludo");
-            dos.writeUTF("hola");
+            dos.writeUTF("hola"); //para enviar un tipo de dato
             String respuesta="";
             respuesta = dis.readUTF();
             System.out.println(id + " Servidor devuelve saludo: " + respuesta);
