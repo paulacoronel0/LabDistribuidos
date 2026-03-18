@@ -1,0 +1,24 @@
+-Descomprimir en un directorio.
+
+- Abrir una terminal en dicho directorio
+
+- Generar las clases de java:
+
+$ javac Servidor.java
+$ javac Cliente.java
+
+- Ejecutar el servidor:
+
+$ java Servidor
+
+- Abrir otra terminal en el mismo directorio
+
+- Ejecutar el cliente:
+
+$ java Cliente
+
+- Ingresar texto y presionar enter
+
+-Cerrar todo una vez terminado:
+
+ctrl-c  en cada terminal.

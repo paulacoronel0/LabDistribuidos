@@ -1,0 +1,4 @@
+servidor estará a la escucha de una conexión en el puerto 5000. Cuando reciba una petición procesara esta y retornara el resultado
+libro: Retorna un libro más autor aleatoriamente
+frase: Retornara una frase aleatoria
+exit: retorna mensaje de despedida pero el servidor continuara a la escucha en el puerto 5000
