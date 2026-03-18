@@ -1,7 +1,12 @@
 
 import java.io.*;
 import java.net.*;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+import java.time.format.ResolverStyle;
 import java.util.logging.*;
+import java.util.*;
 
 //ServidorHilo actuará como INTERMEDIARIO entre la consulta del cliente y la respuesta de los servidores horoscopo, pronostico
 public class ServidorHilo extends Thread {
@@ -21,6 +26,11 @@ public class ServidorHilo extends Thread {
     BufferedReader input_pronostico; //para leer lo que envie el server pronostico
     PrintStream output_pronostico; //para enviar al server pronostico
     private int id_session; //identificador de la conexión
+
+    private static final Set<String> SIGNOS_VALIDOS = new HashSet<>(Arrays.asList(
+        "aries", "tauro", "geminis", "cancer", "leo", "virgo", 
+        "libra", "escorpio", "sagitario", "capricornio", "acuario", "piscis"
+    ));
 
     public ServidorHilo(Socket socket_cliente, int port_h, int port_p, int id) {
         this.port_h = port_h;
@@ -56,37 +66,56 @@ public class ServidorHilo extends Thread {
 
     @Override
     public void run() {
-        String request;
+        String request ;
         String[] consultas; //una consulta para cada server
         try {
             //si recibe nulo, quiere decir que el cliente cerró conexión
             while ((request = input_cliente.readLine()) != null) {
                 try {
                     //se lee la petición del cliente
-                    request = input_cliente.readLine();
+                    //request = input_cliente.readLine();
+                    System.out.println("\tServidor " + id_session + "> recibio: " + request);
+            
+                    if (!request.contains(";")) {
+                        output_cliente.println("\tServidor " + id_session + "> Error: Formato incorrecto. Use signo;fecha");
+                        continue;
+                    }
                     //se la divide
-                    consultas = request.split(" ");
+                    consultas = request.split(";");
                     //ej: "aries 25/12" "aries" "25/12"    
+                    String signo = consultas[0].trim();
+                    String fecha = consultas[1].trim();
 
+                    if (!esSignoValido(signo)) {
+                        output_cliente.println("\tServidor " + id_session + "> Error: El signo '" + signo + "' no es válido.");
+                        continue;
+                    }
+
+                    if (!esFechaValida(fecha)) {
+                        output_cliente.println("\tServidor " + id_session + "> Error: La fecha '" + fecha + "' es inválida o tiene formato incorrecto (use dd/mm/yyyy).");
+                        continue;
+                    }
                     //Para consulta 1 (horoscopo):
                     //envia petición al server encargado del horoscopo.
-                    output_horoscopo.println(consultas[0]);
+                    output_horoscopo.println(signo);
+                    output_horoscopo.flush(); // Asegura que el dato salga hacia ServidorH
                     //captura respuesta e imprime (debug)
                     String respuesta_h = input_horoscopo.readLine();
                     if (respuesta_h != null) {
-                        System.out.println("Servidor " + id_session + "> " + respuesta_h);
+                        System.out.println("\tServidor " + id_session + "> " + respuesta_h);
                     }
 
                     //Para consulta 2 (pronostico):
                     //envia petición al server encargado del pronostico.
-                    output_pronostico.println(consultas[1]);
+                    output_pronostico.println(fecha);
+                    output_pronostico.flush(); // Asegura que el dato salga hacia ServidorP
                     //captura respuesta e imprime (debug)
                     String respuesta_p = input_pronostico.readLine();
                     if (respuesta_p != null) {
-                        System.out.println("Servidor " + id_session + "> " + respuesta_p);
+                        System.out.println("\tServidor " + id_session + "> " + respuesta_p);
                     }
                     // recibir respuestas 
-                    String respuesta = respuesta_h + "-" + respuesta_p;
+                    String respuesta = respuesta_h + "- " + respuesta_p;
                     // enviar al cliente respuesta
                     output_cliente.flush();//vacia contenido
                     output_cliente.println(respuesta);
@@ -103,5 +132,27 @@ public class ServidorHilo extends Thread {
         }
 
         desconnectar();
+    }
+    
+
+    public static boolean esSignoValido(String signo) {
+        if (signo == null) return false;
+        // Quitamos espacios y pasamos a minúsculas para comparar
+        return SIGNOS_VALIDOS.contains(signo.trim().toLowerCase());
+    }
+
+    public static boolean esFechaValida(String fecha) {
+        if (fecha == null) return false;
+        
+        // El formato que esperas del cliente
+        DateTimeFormatter formato = DateTimeFormatter.ofPattern("dd/MM/yyyy")
+                .withResolverStyle(ResolverStyle.SMART); // Estricto para evitar 31/02
+        
+        try {
+            LocalDate.parse(fecha.trim(), formato);
+            return true;
+        } catch (DateTimeParseException e) {
+            return false;
+        }
     }
 }

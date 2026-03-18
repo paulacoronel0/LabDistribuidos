@@ -1,64 +1,94 @@
 import java.io.*;
 import java.net.*;
 import java.util.logging.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class ServidorP extends Thread{
 
     private ServerSocket socket;
-    private DataOutputStream dos;
-    private DataInputStream dis;
-    private int idSessio;
+    BufferedReader input_cliente; //para leer lo que envie el cliente
+    PrintStream output_cliente; //para imprimir datos de salida (cliente)
     private int puerto;
+    
+    String[] pronosticoClima = {
+        "Despejado con ráfagas de viento norte; 22°C.",
+        "Mayormente nublado, baja probabilidad de chaparrones; 15°C.",
+        "Cielo limpio y descenso térmico hacia la noche; 10°C.",
+        "Inestabilidad climática con mejoras temporarias; 18°C.",
+        "Ola de calor: máxima alcanzando los 34°C con humedad alta.",
+        "Niebla matinal reduciendo visibilidad, luego soleado; 12°C.",
+        "Tormentas aisladas con actividad eléctrica moderada."};
+    ArrayList<String> pronosticoClimaList = new ArrayList<String>();
+    private static final ConcurrentHashMap<String, EntradaCache> cache = new ConcurrentHashMap<>();
+    private final long TIEMPO_VIDA = 5 * 60 * 1000; // 60.000 ms = 1 minuto
     
     public ServidorP(ServerSocket socket, int puerto) {
         this.socket = socket;
         this.puerto = puerto;
-        
-        try {
-            dos = new DataOutputStream(socket.getOutputStream());
-            dis = new DataInputStream(socket.getInputStream());
-        } catch (IOException ex) {
-            Logger.getLogger(ServidorHilo.class.getName()).log(Level.SEVERE, null, ex);
-        }
+        Collections.addAll(pronosticoClimaList, pronosticoClima);   
+        //try {
+            
+        //} catch (IOException ex) {
+        //    Logger.getLogger(ServidorHilo.class.getName()).log(Level.SEVERE, null, ex);
+        //}
     }
     
     @Override
     public void run() {
         
         try {
-            System.out.println("ServidorHoroscopo> Servidor iniciado");    
-            System.out.println("ServidorHoroscopo> En espera de cliente...");    
+            System.out.println("ServidorPronostico> Servidor iniciado");    
+            System.out.println("ServidorPronostico> En espera de cliente...");    
             //Socket de cliente
             Socket clientSocket;
             while(true){
                 //en espera de conexion, si existe la acepta
-                clientSocket = socket.accept();
+                clientSocket = socket.accept();  // averiguar si es bloqueante, y sino como hacer 
                 //Para leer lo que envie el cliente
                 BufferedReader input = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
                 //para imprimir datos de salida                
                 PrintStream output = new PrintStream(clientSocket.getOutputStream());
                 //se lee peticion del cliente
-                String request = input.readLine();
-                System.out.println("Cliente(id)> petición [" + request +  "]");
+                //String request = input.readLine();
+                //System.out.println("Cliente(id)> petición [" + request +  "]");
                 //se procesa la peticion y se espera resultado
                 
                 //HACER LO DEL SERVERCACHE
-                String strOutput = process(request);
+                //String strOutput = prediccion(request);
 
                 //Se imprime en consola "servidor"
-                System.out.println("ServidorHoroscopo> Resultado de petición");                    
-                System.out.println("ServidorHoroscopo> \"" + strOutput + "\"");
+                //System.out.println("ServidorPronostico> Resultado de petición");                    
+                //System.out.println("ServidorPronostico> \"" + strOutput + "\"");
                 //se imprime en cliente
-                output.flush();//vacia contenido
-                output.println(strOutput);                
+                //output.flush();  //vacia contenido
+                //output.println(strOutput); 
+                // OPCION 2
+                String request;
+                // Bucle de persistencia: se queda aquí mientras SC mande datos
+                while ((request = input.readLine()) != null) {
+                    if (request.trim().isEmpty()) continue;
+                    
+                    System.out.println("ServidorPronostico> Procesando: " + request);
+                    String result = prediccion(request);
+
+                    System.out.println("ServidorPronostico> Resultado de petición");                    
+                    System.out.println("ServidorPronostico> \"" + result + "\"");
+                    
+                    output.println(result);
+                    output.flush(); // Forzamos la salida inmediata
+                }
+
+                System.out.println("ServidorPronostico> El intermediario cerró la conexión.");               
                 //cierra conexion
                 clientSocket.close();
             }    
         } catch (IOException ex) {
             System.err.println(ex.getMessage());
         }
+        desconnectar();
     }
-
     
     public void desconnectar() {
         try {
@@ -68,61 +98,45 @@ public class ServidorP extends Thread{
         }
     }
     
+    public String prediccion(String request) {
+        String llave = request.trim().toLowerCase();
+        
+        // 1. Intentamos obtener la entrada
+        EntradaCache entrada = cache.get(llave);
 
-    
-    /**
-     * procesa peticion del cliente y retorna resultado
-     * @param request peticion del cliente
-     * @return String
-     */
-    public static String process(String request){
-        int t =0;
-        String result="";        
-        //frases
-        String[] phrases = {
-            "La tecnología se alimenta a si misma. La tecnología hace posible más tecnología.-Alvin Toffler.",
-            "La tecnología es sólo una herramienta. En términos de llevar a los niños a trabajar juntos y motivarlos, el profesor es el más importante.-Bill Gates.",
-            "La máquina tecnológicamente más eficiente que el hombre ha inventado es el libro.-Northrop Frye.",
-            "Ya no hacen más los bugs como bunny - Olav Mjelde",
-            "Un lenguaje de programación es de bajo nivel cuando requiere que prestes atencion a lo irrelevante.-Alan J. Perlis.",
-            "Hablar es barato. Enséñame el código.-Linus Torvalds ",
-            "No me importa si funciona en su máquina! No me envían su máquina!.-Vidiu Platon",
-            "Siempre codifica como si la persona que finalmente mantendrá tu código fuera un psicópata violento que sabe dónde vives.-Martin Golding"};
-	ArrayList<String> phrasesList = new ArrayList<String>();
-	Collections.addAll(phrasesList, phrases);
-        //libros
-        String[] books = {
-            "Divina Comedia - Dante Alighieri", 
-            "Don Quijote de la Mancha - Miguel de Cervantes",
-            "Cien años de soledad - Gabriel García Márquez",
-            "Moby Dick - Herman Melville",
-            "Ana Karenina - Lev Tolstói",
-            "Eneida - Virgilio",
-            "Otelo - William Shakespeare",
-            "El viejo y el mar - Ernest Hemingway",
-            "Orgullo y prejuicio - Jane Austen"};
-	ArrayList<String> booksList = new ArrayList<String>();
-	Collections.addAll(booksList, books);            
-                if (request.equals("frase")) {t=1;}
-                if (request.equals("libro")) t=2; 
-                if (request.equals("exit")) t=3;  
-        switch(t){
-            case 1:
-                Collections.shuffle(phrasesList);
-                result = phrasesList.get(0);
-                break;
-            case 2:
-                Collections.shuffle(booksList);
-                result = booksList.get(0);
-                break;
-            case 3:                
-                result = "bye";
-                break;
-            default:
-                result = "La peticion no se puede resolver.";
-                break;
+        // 2. Si existe, verificamos si expiró
+        if (entrada != null && entrada.expiro(TIEMPO_VIDA)) {
+            System.out.println("ServidorPronostico> Cache expirada para: " + llave + ". Eliminando...");
+            cache.remove(llave); // LO ELIMINAMOS
+            entrada = null;      // Forzamos a que entre al siguiente bloque
         }
-        return result;
+
+        // 3. Si no existía (o lo acabamos de borrar por expirar)
+        if (entrada == null) {
+            Collections.shuffle(pronosticoClimaList);
+            String nuevaFrase = pronosticoClimaList.get(0);
+            
+            entrada = new EntradaCache(nuevaFrase);
+            cache.put(llave, entrada);
+            System.out.println("ServidorPronostico> Nueva entrada creada para: " + llave);
+        }
+
+        return entrada.respuesta;
+    }
+
+    private static class EntradaCache {
+        String respuesta;
+        long tiempoCreacion;
+
+        EntradaCache(String respuesta) {
+            this.respuesta = respuesta;
+            this.tiempoCreacion = System.currentTimeMillis();
+        }
+
+        // Verifica si pasaron más de X milisegundos
+        boolean expiro(long ttl) {
+            return (System.currentTimeMillis() - tiempoCreacion) > ttl;
+        }
     }
     
 }
