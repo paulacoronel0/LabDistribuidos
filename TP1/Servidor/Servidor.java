@@ -1,30 +1,43 @@
+
 import java.io.*;
 import java.net.*;
 import java.util.logging.*;
 
-//intermediario
+//genera hilos para responder de forma concurrente a cada cliente
 public class Servidor {
+
     public static void main(String args[]) throws IOException {
         ServerSocket ss;
         System.out.print("Inicializando servidor... ");
+        final int PORT_SERVER = 5000;
+        final int PORT_SERVER_H = 5001;
+        final int PORT_SERVER_P = 5002;
+        //inicializo ambos sockets de los servidores horoscopo, pronostico
+        ServerSocket s_horoscopo = new ServerSocket(PORT_SERVER_H);
+        ServerSocket s_pronostico = new ServerSocket(PORT_SERVER_P);
+        System.out.print("Configurando servidores horoscopo, pronostico... ");
         try {
-            ss = new ServerSocket(10578);
+            //abro socket del servidor
+            ss = new ServerSocket(PORT_SERVER);
             System.out.println("\t[OK]");
             int idSession = 0;
-            //abrir serverH, serverP aca
-            (ServidorH) new ServidorH(socket_h, puertoH)).start();
-            (ServidorP) new ServidorP(socket_p, puertoP)).start();
+
+            //Abrimos servidores de horoscopo, pronostico (global para todos los clientes)
+            ((ServidorH) new ServidorH(s_horoscopo, PORT_SERVER_H)).start();
+            ((ServidorP) new ServidorP(s_pronostico, PORT_SERVER_P)).start();
+
             while (true) {
                 Socket socket;
-                socket = ss.accept();
+                socket = ss.accept(); //aceptamos la conexión, redirigimos
                 System.out.println("Nueva conexión entrante: " + socket);
-                
-                ((ServidorHilo) new ServidorHilo(socket_h, socket_p, idSession, puertoH, puertoP)).start();
+
+                //Server buscará info para cada cliente 
+                ((ServidorHilo) new ServidorHilo(socket, PORT_SERVER_H, PORT_SERVER_P, idSession)).start();
                 idSession++;
             }
         } catch (IOException ex) {
             Logger.getLogger(Servidor.class.getName()).log(Level.SEVERE, null, ex);
-        } finally{
+        } finally {
             // cierra todos los server
         }
     }
@@ -32,8 +45,7 @@ public class Servidor {
 
 // CLIENTE --> SERVIDOR (INTERMEDIARIO) --> SERVERHILO (funcione como cliente de los SH y SC, pero servidor CLIENTE) --> SERVER_H , SERVER_C
 // SERVER_H , SERVER_P (Tienen caché)
-
 //idea
 //if (time_since_last_request > TIMEOUT) {
-    //cerrar_servidor();
+//cerrar_servidor();
 //}
