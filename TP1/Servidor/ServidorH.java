@@ -1,18 +1,16 @@
+
 import java.io.*;
 import java.net.*;
-import java.util.logging.*;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class ServidorH extends Thread{
+public class ServidorH extends Thread {
 
     private ServerSocket socket;
-    BufferedReader input_cliente; //para leer lo que envie el cliente
-    PrintStream output_cliente; //para imprimir datos de salida (cliente)
     private int puerto;
-    
-    String[] horoscopo = {
+
+    private final String[] horoscopo = {
         "Enfoque en proyectos personales; éxito inminente.",
         "Momento de introspección: evita decisiones impulsivas.",
         "Nuevas oportunidades laborales en el horizonte cercano.",
@@ -20,93 +18,49 @@ public class ServidorH extends Thread{
         "Conexiones inesperadas traerán claridad a tus dudas.",
         "Período de abundancia creativa: aprovecha el impulso.",
         "Mantén la calma ante desafíos burocráticos hoy."};
-    ArrayList<String> horoscopoList = new ArrayList<String>();
+
+    private ArrayList<String> horoscopoList;
+
+    //caché para consultas repetidas de horoscopo
     private static final ConcurrentHashMap<String, EntradaCache> cache = new ConcurrentHashMap<>();
-    private final long TIEMPO_VIDA = 5 * 60 * 1000; // 60.000 ms = 1 minuto
-    
+    private final long TIEMPO_VIDA = 2 * 60 * 1000; // 60.000 ms = 1 minuto, 2min la caché almacenará el dato.
+
     public ServidorH(ServerSocket socket, int puerto) {
         this.socket = socket;
         this.puerto = puerto;
-        Collections.addAll(horoscopoList, horoscopo);   
-        //try {
-            
-        //} catch (IOException ex) {
-        //    Logger.getLogger(ServidorHilo.class.getName()).log(Level.SEVERE, null, ex);
-        //}
+        this.horoscopoList = new ArrayList<>();
+        Collections.addAll(this.horoscopoList, this.horoscopo);
     }
-    
+
     @Override
     public void run() {
-        
+
         try {
-            System.out.println("ServidorHoroscopo> Servidor iniciado");    
-            System.out.println("ServidorHoroscopo> En espera de cliente...");    
-            while(true){
+            System.out.println("ServidorHoroscopo> Servidor iniciado");
+            System.out.println("ServidorHoroscopo> En espera de cliente...");
+            //Socket de cliente
+            Socket clientSocket;
+            int idSession = 0; //para identificar conexión
+            while (true) {
                 //en espera de conexion, si existe la acepta
-                Socket clientSocket = socket.accept();  // averiguar si es bloqueante, y sino como hacer 
-                System.out.println("ServidorHoroscopo> Conexión aceptada");
-                //Para leer lo que envie el cliente
-                BufferedReader input = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-                
-                //para imprimir datos de salida                
-                PrintStream output = new PrintStream(clientSocket.getOutputStream());
-                //se lee peticion del cliente
-                //String request = input.readLine();
-                //System.out.println("Cliente(id)> petición [" + request +  "]");
-                //se procesa la peticion y se espera resultado
-                
-                //HACER LO DEL SERVERCACHE
-                //String strOutput = prediccion(request);
+                clientSocket = socket.accept();  // averiguar si es bloqueante, y sino como hacer 
+                new Thread(new ManejadorH(clientSocket, idSession)).start();
+                idSession++;
 
-                //Se imprime en consola "servidor"
-                //System.out.println("ServidorHoroscopo> Resultado de petición");                    
-                //System.out.println("ServidorHoroscopo> \"" + strOutput + "\"");
-                //se imprime en cliente
-                //output.flush();  //vacia contenido
-                //output.println(strOutput);   
-                
-                // OPCION 2
-                String request;
-                // Bucle de persistencia: se queda aquí mientras SC mande datos
-                while ((request = input.readLine()) != null) {
-                    if (request.trim().isEmpty()) continue;
-                    
-                    System.out.println("ServidorHoroscopo> Procesando: " + request);
-                    String result = prediccion(request);
-
-                    System.out.println("ServidorHoroscopo> Resultado de petición");                    
-                    System.out.println("ServidorHoroscopo> \"" + result + "\"");
-                    
-                    output.println(result);
-                    output.flush(); // Forzamos la salida inmediata
-                }
-
-                System.out.println("ServidorHoroscopo> El intermediario cerró la conexión.");
-                //cierra conexion
-                clientSocket.close();
-            }    
+            }
         } catch (IOException ex) {
             System.err.println(ex.getMessage());
         }
-        desconnectar();
     }
-    
-    public void desconnectar() {
-        try {
-            socket.close();
-        } catch (IOException ex) {
-            Logger.getLogger(ServidorHilo.class.getName()).log(Level.SEVERE, null, ex);
-        }
-    }
-    
+
     public String prediccion(String request) {
         String llave = request.trim().toLowerCase();
-        
+
         // 1. Intentamos obtener la entrada
         EntradaCache entrada = cache.get(llave);
 
         // 2. Si existe, verificamos si expiró
-        if (entrada != null && entrada.expiro(TIEMPO_VIDA)) {
+        if (entrada != null && entrada.expiro(this.TIEMPO_VIDA)) {
             System.out.println("ServidorHoroscopo> Cache expirada para: " + llave + ". Eliminando...");
             cache.remove(llave); // LO ELIMINAMOS
             entrada = null;      // Forzamos a que entre al siguiente bloque
@@ -116,7 +70,6 @@ public class ServidorH extends Thread{
         if (entrada == null) {
             Collections.shuffle(horoscopoList);
             String nuevaFrase = horoscopoList.get(0);
-            
             entrada = new EntradaCache(nuevaFrase);
             cache.put(llave, entrada);
             System.out.println("ServidorHoroscopo> Nueva entrada creada para: " + llave);
@@ -125,7 +78,9 @@ public class ServidorH extends Thread{
         return entrada.respuesta;
     }
 
+    //clase que controla la caché
     private static class EntradaCache {
+
         String respuesta;
         long tiempoCreacion;
 
@@ -136,8 +91,54 @@ public class ServidorH extends Thread{
 
         // Verifica si pasaron más de X milisegundos
         boolean expiro(long ttl) {
-            return (System.currentTimeMillis() - tiempoCreacion) > ttl;
+            return (System.currentTimeMillis() - this.tiempoCreacion) > ttl;
         }
     }
-    
+
+    class ManejadorH implements Runnable {
+
+        //se crea para cada cliente, para generar concurrencia en las consultas del horoscopo
+        private final Socket socket;
+        private final int id;
+
+        public ManejadorH(Socket socket, int id) {
+            this.socket = socket;
+            this.id = id;
+        }
+
+        @Override
+
+        public void run() {
+            try {
+                BufferedReader input = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+                PrintStream output = new PrintStream(socket.getOutputStream());
+                String solicitud;
+                while ((solicitud = input.readLine()) != null) {
+                    if (solicitud.trim().isEmpty()) {
+                        continue;
+                    }
+
+                    System.out.println("ServidorHoroscopo> Procesando: " + solicitud + " <Cliente " + this.id + ">");
+                    String resultado = prediccion(solicitud);
+
+                    System.out.println("ServidorHoroscopo> Resultado de petición" + " <Cliente " + this.id + ">");
+                    System.out.println("ServidorHoroscopo> \"" + solicitud + "\"");
+
+                    output.println(resultado);
+                    output.flush(); // Forzamos la salida inmediata
+                }
+                System.out.println("ServidorHoroscopo> Cliente cierra la conexión." + " <Cliente " + this.id + ">");
+            } catch (IOException ex) {
+                System.getLogger(ServidorH.class.getName()).log(System.Logger.Level.ERROR, (String) null, ex);
+            } finally {
+                try {
+                    //cierra conexion
+                    socket.close();
+                } catch (IOException ex) {
+                    System.getLogger(ServidorH.class.getName()).log(System.Logger.Level.ERROR, (String) null, ex);
+                }
+            }
+        }
+    }
+
 }

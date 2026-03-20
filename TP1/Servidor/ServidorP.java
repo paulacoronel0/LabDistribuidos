@@ -1,18 +1,16 @@
+
 import java.io.*;
 import java.net.*;
-import java.util.logging.*;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class ServidorP extends Thread{
+public class ServidorP extends Thread {
 
     private ServerSocket socket;
-    BufferedReader input_cliente; //para leer lo que envie el cliente
-    PrintStream output_cliente; //para imprimir datos de salida (cliente)
     private int puerto;
-    
-    String[] pronosticoClima = {
+
+    private final String[] pronosticoClima = {
         "Despejado con ráfagas de viento norte; 22°C.",
         "Mayormente nublado, baja probabilidad de chaparrones; 15°C.",
         "Cielo limpio y descenso térmico hacia la noche; 10°C.",
@@ -20,87 +18,42 @@ public class ServidorP extends Thread{
         "Ola de calor: máxima alcanzando los 34°C con humedad alta.",
         "Niebla matinal reduciendo visibilidad, luego soleado; 12°C.",
         "Tormentas aisladas con actividad eléctrica moderada."};
-    ArrayList<String> pronosticoClimaList = new ArrayList<String>();
+
+    private ArrayList<String> pronosticoClimaList;
+    //caché para consultas repetidas de horoscopo
     private static final ConcurrentHashMap<String, EntradaCache> cache = new ConcurrentHashMap<>();
-    private final long TIEMPO_VIDA = 5 * 60 * 1000; // 60.000 ms = 1 minuto
-    
+    private final long TIEMPO_VIDA = 2 * 60 * 1000; // 60.000 ms = 1 minuto, 2min la caché almacenará el dato.
+
     public ServidorP(ServerSocket socket, int puerto) {
         this.socket = socket;
         this.puerto = puerto;
-        Collections.addAll(pronosticoClimaList, pronosticoClima);   
-        //try {
-            
-        //} catch (IOException ex) {
-        //    Logger.getLogger(ServidorHilo.class.getName()).log(Level.SEVERE, null, ex);
-        //}
+        this.pronosticoClimaList = new ArrayList<>();
+        Collections.addAll(this.pronosticoClimaList, this.pronosticoClima);
     }
-    
+
     @Override
     public void run() {
-        
+
         try {
-            System.out.println("ServidorPronostico> Servidor iniciado");    
-            System.out.println("ServidorPronostico> En espera de cliente...");    
+            System.out.println("ServidorPronostico> Servidor iniciado");
+            System.out.println("ServidorPronostico> En espera de cliente...");
             //Socket de cliente
             Socket clientSocket;
-            while(true){
+            int idSession = 0; //para identificar conexión
+            while (true) {
                 //en espera de conexion, si existe la acepta
                 clientSocket = socket.accept();  // averiguar si es bloqueante, y sino como hacer 
-                //Para leer lo que envie el cliente
-                BufferedReader input = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-                //para imprimir datos de salida                
-                PrintStream output = new PrintStream(clientSocket.getOutputStream());
-                //se lee peticion del cliente
-                //String request = input.readLine();
-                //System.out.println("Cliente(id)> petición [" + request +  "]");
-                //se procesa la peticion y se espera resultado
-                
-                //HACER LO DEL SERVERCACHE
-                //String strOutput = prediccion(request);
-
-                //Se imprime en consola "servidor"
-                //System.out.println("ServidorPronostico> Resultado de petición");                    
-                //System.out.println("ServidorPronostico> \"" + strOutput + "\"");
-                //se imprime en cliente
-                //output.flush();  //vacia contenido
-                //output.println(strOutput); 
-                // OPCION 2
-                String request;
-                // Bucle de persistencia: se queda aquí mientras SC mande datos
-                while ((request = input.readLine()) != null) {
-                    if (request.trim().isEmpty()) continue;
-                    
-                    System.out.println("ServidorPronostico> Procesando: " + request);
-                    String result = prediccion(request);
-
-                    System.out.println("ServidorPronostico> Resultado de petición");                    
-                    System.out.println("ServidorPronostico> \"" + result + "\"");
-                    
-                    output.println(result);
-                    output.flush(); // Forzamos la salida inmediata
-                }
-
-                System.out.println("ServidorPronostico> El intermediario cerró la conexión.");               
-                //cierra conexion
-                clientSocket.close();
-            }    
+                new Thread(new ManejadorP(clientSocket, idSession)).start();
+                idSession++;
+            }
         } catch (IOException ex) {
             System.err.println(ex.getMessage());
         }
-        desconnectar();
     }
-    
-    public void desconnectar() {
-        try {
-            socket.close();
-        } catch (IOException ex) {
-            Logger.getLogger(ServidorHilo.class.getName()).log(Level.SEVERE, null, ex);
-        }
-    }
-    
+
     public String prediccion(String request) {
         String llave = request.trim().toLowerCase();
-        
+
         // 1. Intentamos obtener la entrada
         EntradaCache entrada = cache.get(llave);
 
@@ -115,7 +68,7 @@ public class ServidorP extends Thread{
         if (entrada == null) {
             Collections.shuffle(pronosticoClimaList);
             String nuevaFrase = pronosticoClimaList.get(0);
-            
+
             entrada = new EntradaCache(nuevaFrase);
             cache.put(llave, entrada);
             System.out.println("ServidorPronostico> Nueva entrada creada para: " + llave);
@@ -125,6 +78,7 @@ public class ServidorP extends Thread{
     }
 
     private static class EntradaCache {
+
         String respuesta;
         long tiempoCreacion;
 
@@ -138,5 +92,51 @@ public class ServidorP extends Thread{
             return (System.currentTimeMillis() - tiempoCreacion) > ttl;
         }
     }
-    
+
+    class ManejadorP implements Runnable {
+
+        //se crea para cada cliente, para generar concurrencia en las consultas del pronostico
+        private final Socket socket;
+        private final int id;
+
+        public ManejadorP(Socket socket, int id) {
+            this.socket = socket;
+            this.id = id;
+        }
+
+        @Override
+
+        public void run() {
+            try {
+                BufferedReader input = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+                PrintStream output = new PrintStream(socket.getOutputStream());
+                String solicitud;
+                while ((solicitud = input.readLine()) != null) {
+                    if (solicitud.trim().isEmpty()) {
+                        continue;
+                    }
+
+                    System.out.println("ServidorPronostico> Procesando: " + solicitud + " <Cliente " + this.id + ">");
+                    String resultado = prediccion(solicitud);
+
+                    System.out.println("ServidorPronostico> Resultado de petición" + " <Cliente " + this.id + ">");
+                    System.out.println("ServidorPronostico> \"" + solicitud + "\"");
+
+                    output.println(resultado);
+                    output.flush(); // Forzamos la salida inmediata
+                }
+                System.out.println("ServidorPronostico> Cliente cierra la conexión." + " <Cliente " + this.id + ">");
+            } catch (IOException ex) {
+                System.getLogger(ServidorP.class.getName()).log(System.Logger.Level.ERROR, (String) null, ex);
+            } finally {
+                try {
+                    //cierra conexion
+                    socket.close();
+                } catch (IOException ex) {
+                    System.getLogger(ServidorP.class.getName()).log(System.Logger.Level.ERROR, (String) null, ex);
+                }
+            }
+        }
+    }
+
 }

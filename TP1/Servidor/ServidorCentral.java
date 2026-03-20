@@ -4,7 +4,7 @@ import java.net.*;
 import java.util.logging.*;
 
 //genera hilos para responder de forma concurrente a cada cliente
-public class Servidor {
+public class ServidorCentral {
 
     public static void main(String args[]) throws IOException {
         ServerSocket ss;
@@ -36,16 +36,9 @@ public class Servidor {
                 idSession++;
             }
         } catch (IOException ex) {
-            Logger.getLogger(Servidor.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(ServidorCentral.class.getName()).log(Level.SEVERE, null, ex);
         } finally {
             // cierra todos los server
         }
     }
 }
-
-// CLIENTE --> SERVIDOR (INTERMEDIARIO) --> SERVERHILO (funcione como cliente de los SH y SC, pero servidor CLIENTE) --> SERVER_H , SERVER_C
-// SERVER_H , SERVER_P (Tienen caché)
-//idea
-//if (time_since_last_request > TIMEOUT) {
-//cerrar_servidor();
-//}
