@@ -3,9 +3,9 @@ import java.io.*;
 import java.net.*;
 import java.util.logging.*;
 
-//genera hilos para responder de forma concurrente a cada cliente
 public class ServidorCentral {
 
+    //genera hilos para responder de forma concurrente a cada cliente
     public static void main(String args[]) throws IOException {
         ServerSocket ss;
         System.out.print("Inicializando servidor... ");
@@ -22,23 +22,21 @@ public class ServidorCentral {
             System.out.println("\t[OK]");
             int idSession = 0;
 
-            //Abrimos servidores de horoscopo, pronostico (global para todos los clientes)
+            //Abrimos servidores de horoscopo, pronostico
             ((ServidorH) new ServidorH(s_horoscopo, PORT_SERVER_H)).start();
             ((ServidorP) new ServidorP(s_pronostico, PORT_SERVER_P)).start();
-
+            //estos estarán "escuchando" hasta que llegue un nuevo cliente
             while (true) {
                 Socket socket;
-                socket = ss.accept(); //aceptamos la conexión, redirigimos
+                socket = ss.accept(); //aceptamos la conexión, redirigimos hacia un nuevo hilo que controle la petición.
                 System.out.println("Nueva conexión entrante: " + socket);
 
-                //Server buscará info para cada cliente 
+                //Este Servidor buscará la información en los otros servidores para cada cliente 
                 ((ServidorHilo) new ServidorHilo(socket, PORT_SERVER_H, PORT_SERVER_P, idSession)).start();
                 idSession++;
             }
         } catch (IOException ex) {
             Logger.getLogger(ServidorCentral.class.getName()).log(Level.SEVERE, null, ex);
-        } finally {
-            // cierra todos los server
         }
     }
 }

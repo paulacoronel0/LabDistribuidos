@@ -43,7 +43,9 @@ public class ServidorH extends Thread {
             int idSession = 0; //para identificar conexión
             while (true) {
                 //en espera de conexion, si existe la acepta
-                clientSocket = socket.accept();  // averiguar si es bloqueante, y sino como hacer 
+                clientSocket = socket.accept();
+                //una vez la acepta, genera un nuevo hilo que se encargará de responder al cliente
+                //(para poder realizar consultas en simultáneo de varios clientes)
                 new Thread(new ManejadorH(clientSocket, idSession)).start();
                 idSession++;
 
@@ -54,6 +56,8 @@ public class ServidorH extends Thread {
     }
 
     public String prediccion(String request) {
+        //Este método se encarga de devolver una respuesta (puede ser desde la caché o generada)
+
         String llave = request.trim().toLowerCase();
 
         // 1. Intentamos obtener la entrada
@@ -62,15 +66,21 @@ public class ServidorH extends Thread {
         // 2. Si existe, verificamos si expiró
         if (entrada != null && entrada.expiro(this.TIEMPO_VIDA)) {
             System.out.println("ServidorHoroscopo> Cache expirada para: " + llave + ". Eliminando...");
-            cache.remove(llave); // LO ELIMINAMOS
-            entrada = null;      // Forzamos a que entre al siguiente bloque
+            cache.remove(llave); // Si expiró el tiempo, se remueve.
+            entrada = null;      // Luego, forzamos a que lo genere de nuevo si fuera el caso.
+        }
+
+        //BORRAR LUEGO, PRUEBA CACHÉ
+        if (entrada != null) {
+            System.out.println("\nServidorHoroscopo> Dato CACHÉ: " + llave + "-" + entrada);
         }
 
         // 3. Si no existía (o lo acabamos de borrar por expirar)
         if (entrada == null) {
-            Collections.shuffle(horoscopoList);
-            String nuevaFrase = horoscopoList.get(0);
-            entrada = new EntradaCache(nuevaFrase);
+            Collections.shuffle(horoscopoList); //ordenamos aleatoriamente la lista
+            String nuevaFrase = horoscopoList.get(0); //retornamos cualquier valor
+
+            entrada = new EntradaCache(nuevaFrase); //generamos nueva entrada (guardada en caché)
             cache.put(llave, entrada);
             System.out.println("ServidorHoroscopo> Nueva entrada creada para: " + llave);
         }
@@ -114,25 +124,27 @@ public class ServidorH extends Thread {
                 PrintStream output = new PrintStream(socket.getOutputStream());
                 String solicitud;
                 while ((solicitud = input.readLine()) != null) {
+                    //en caso de que la solicitud tuviera un formato incorrecto
                     if (solicitud.trim().isEmpty()) {
                         continue;
                     }
 
                     System.out.println("ServidorHoroscopo> Procesando: " + solicitud + " <Cliente " + this.id + ">");
+                    //retornamos resultado (desde la caché o generado)
                     String resultado = prediccion(solicitud);
 
                     System.out.println("ServidorHoroscopo> Resultado de petición" + " <Cliente " + this.id + ">");
                     System.out.println("ServidorHoroscopo> \"" + solicitud + "\"");
 
                     output.println(resultado);
-                    output.flush(); // Forzamos la salida inmediata
+                    output.flush(); // Forzamos el envio al ServidorHilo
                 }
                 System.out.println("ServidorHoroscopo> Cliente cierra la conexión." + " <Cliente " + this.id + ">");
             } catch (IOException ex) {
                 System.getLogger(ServidorH.class.getName()).log(System.Logger.Level.ERROR, (String) null, ex);
             } finally {
                 try {
-                    //cierra conexion
+                    //cierra conexión
                     socket.close();
                 } catch (IOException ex) {
                     System.getLogger(ServidorH.class.getName()).log(System.Logger.Level.ERROR, (String) null, ex);
