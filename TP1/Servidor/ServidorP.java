@@ -71,7 +71,7 @@ public class ServidorP extends Thread {
 
         //BORRAR LUEGO, PRUEBA CACHÉ
         if (entrada != null) {
-            System.out.println("\nServidorHoroscopo> Dato CACHÉ: " + llave + "-" + entrada);
+            System.out.println("\nServidorHoroscopo> Dato CACHÉ: " + llave + "-" + entrada.respuesta);
         }
 
         // 3. Si no existía (o lo acabamos de borrar por expirar)
@@ -128,16 +128,16 @@ public class ServidorP extends Thread {
                         continue;
                     }
 
-                    System.out.println("ServidorPronostico> Procesando: " + solicitud + " <Cliente " + this.id + ">");
+                    System.out.println("ServidorPronostico> Procesando: " + solicitud + " <Sesión " + this.id + ">");
                     String resultado = prediccion(solicitud);
 
-                    System.out.println("ServidorPronostico> Resultado de petición" + " <Cliente " + this.id + ">");
+                    System.out.println("ServidorPronostico> Resultado de petición" + " <Sesión " + this.id + ">");
                     System.out.println("ServidorPronostico> \"" + solicitud + "\"");
 
                     output.println(resultado);
                     output.flush(); // Forzamos el envio al ServidorHilo
                 }
-                System.out.println("ServidorPronostico> Cliente cierra la conexión." + " <Cliente " + this.id + ">");
+                System.out.println("ServidorPronostico> Cliente cierra la conexión." + " <Sesión " + this.id + ">");
             } catch (IOException ex) {
                 System.getLogger(ServidorP.class.getName()).log(System.Logger.Level.ERROR, (String) null, ex);
             } finally {

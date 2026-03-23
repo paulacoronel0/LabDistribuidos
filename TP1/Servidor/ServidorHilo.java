@@ -84,7 +84,6 @@ public class ServidorHilo extends Thread {
                     //ej: "aries 25/12" "aries" "25/12"    
                     String signo = consultas[0].trim();
                     String fecha = consultas[1].trim();
-
                     /*luego, verificamos que el signo y la fecha sean válidos 
                     (en nuestro caso, no deberia pasar, pero será útil si dejamos que el cliente ingrese cualquier solicitud)*/
                     if (!esSignoValido(signo)) {

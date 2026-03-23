@@ -54,10 +54,11 @@ class Persona extends Thread {
             //para enviar datos al servidor
             output = new PrintStream(socket.getOutputStream());
 
-            for (int i = 0; i < 5; i++) {
+            for (int i = 0; i < 3; i++) {
                 // Generar petición aleatoria: "Signo;Fecha"
                 String signoAleatorio = SIGNOS[random.nextInt(SIGNOS.length)];
                 String fechaAleatoria = FECHAS[random.nextInt(FECHAS.length)];
+                //la petición contiene lo pedido por el cliente y su identificador.
                 String request = signoAleatorio + ";" + fechaAleatoria;
 
                 System.out.println("Cliente " + id + "> Enviando: " + request);
@@ -71,7 +72,7 @@ class Persona extends Thread {
                 // Pequeña pausa de 1 segundo entre peticiones para ver el flujo
                 Thread.sleep(1000);
             }
-            // Al finalizar las 5 peticiones, enviamos exit para cerrar
+            // Al finalizar las 3 peticiones, enviamos exit para cerrar
             output.println("exit");
             System.out.println("Cliente " + id + "> Pruebas finalizadas. Enviando exit...");
 

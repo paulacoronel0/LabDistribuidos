@@ -7,7 +7,7 @@ public class ServidorCentral {
 
     //genera hilos para responder de forma concurrente a cada cliente
     public static void main(String args[]) throws IOException {
-        ServerSocket ss;
+        ServerSocket ss = null;
         System.out.print("Inicializando servidor... ");
         final int PORT_SERVER = 5000;
         final int PORT_SERVER_H = 5001;
@@ -19,6 +19,7 @@ public class ServidorCentral {
         try {
             //abro socket del servidor
             ss = new ServerSocket(PORT_SERVER);
+            
             System.out.println("\t[OK]");
             int idSession = 0;
 
@@ -27,16 +28,34 @@ public class ServidorCentral {
             ((ServidorP) new ServidorP(s_pronostico, PORT_SERVER_P)).start();
             //estos estarán "escuchando" hasta que llegue un nuevo cliente
             while (true) {
-                Socket socket;
-                socket = ss.accept(); //aceptamos la conexión, redirigimos hacia un nuevo hilo que controle la petición.
-                System.out.println("Nueva conexión entrante: " + socket);
+                try{
+                    Socket socket;
+                    ss.setSoTimeout(5000); //5 segundos esperando nuevas conexiones
+                    socket = ss.accept(); //aceptamos la conexión, redirigimos hacia un nuevo hilo que controle la petición.
+                    System.out.println("Nueva conexión entrante: " + socket);
 
-                //Este Servidor buscará la información en los otros servidores para cada cliente 
-                ((ServidorHilo) new ServidorHilo(socket, PORT_SERVER_H, PORT_SERVER_P, idSession)).start();
-                idSession++;
+                    //Este Servidor buscará la información en los otros servidores para cada cliente 
+                    ((ServidorHilo) new ServidorHilo(socket, PORT_SERVER_H, PORT_SERVER_P, idSession)).start();
+                    idSession++;        
+                } catch (SocketTimeoutException e){
+                    System.out.println("Sin actividad por 5 segundos. Cerrando servidor...");
+                    break;
+                }
             }
         } catch (IOException ex) {
             Logger.getLogger(ServidorCentral.class.getName()).log(Level.SEVERE, null, ex);
+        }finally{
+            if(ss != null){
+                ss.close();
+            }
+
+            if(s_horoscopo != null){
+                s_horoscopo.close();
+            }
+
+            if(s_pronostico != null){
+                s_pronostico.close();
+            }
         }
     }
 }
