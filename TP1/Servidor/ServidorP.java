@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.concurrent.ConcurrentHashMap;
 
+
 public class ServidorP extends Thread {
 
     private ServerSocket socket;
@@ -21,9 +22,9 @@ public class ServidorP extends Thread {
 
     private ArrayList<String> pronosticoClimaList;
 
-    //caché para consultas repetidas de pronostico
+    // Caché para consultas repetidas de pronostico
     private static final ConcurrentHashMap<String, EntradaCache> cache = new ConcurrentHashMap<>();
-    private final long TIEMPO_VIDA = 2 * 60 * 1000; // 60.000 ms = 1 minuto, durante 2min la caché almacenará el dato.
+    private final long TIEMPO_VIDA = Config.TIEMPO_VIDA_CACHE; // 60.000 ms = 1 minuto, durante 2min la caché almacenará el dato.
 
     public ServidorP(ServerSocket socket, int puerto) {
         this.socket = socket;
@@ -87,7 +88,7 @@ public class ServidorP extends Thread {
         return entrada.respuesta;
     }
 
-    //clase que controla la caché
+    // Clase que controla la caché
     private static class EntradaCache {
 
         String respuesta;
@@ -106,7 +107,7 @@ public class ServidorP extends Thread {
 
     class ManejadorP implements Runnable {
 
-        //se crea para cada cliente, para generar concurrencia en las consultas del pronostico
+        // Se crea un ManejadorP para cada cliente, para generar concurrencia en las consultas del pronostico
         private final Socket socket;
         private final int id;
 

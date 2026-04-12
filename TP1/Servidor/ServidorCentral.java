@@ -3,42 +3,40 @@ import java.io.*;
 import java.net.*;
 import java.util.logging.*;
 
+
 public class ServidorCentral {
 
-    //genera hilos para responder de forma concurrente a cada cliente
+    // Genera hilos para responder de forma concurrente a cada cliente
     public static void main(String args[]) throws IOException {
         ServerSocket ss = null;
         System.out.print("Inicializando servidor... ");
-        final int PORT_SERVER = 5000;
-        final int PORT_SERVER_H = 5001;
-        final int PORT_SERVER_P = 5002;
-        //inicializo ambos sockets de los servidores horoscopo, pronostico
-        ServerSocket s_horoscopo = new ServerSocket(PORT_SERVER_H);
-        ServerSocket s_pronostico = new ServerSocket(PORT_SERVER_P);
+        // Inicializo ambos sockets de los servidores horoscopo, pronostico
+        ServerSocket s_horoscopo = new ServerSocket(Config.PUERTO_SERVIDOR_HOROSCOPO);
+        ServerSocket s_pronostico = new ServerSocket(Config.PUERTO_SERVIDOR_PRONOSTICO);
         System.out.print("Configurando servidores horoscopo, pronostico... ");
         try {
-            //abro socket del servidor
-            ss = new ServerSocket(PORT_SERVER);
+            // Abro socket del servidor
+            ss = new ServerSocket(Config.PUERTO_SERVIDOR_CENTRAL);
             
             System.out.println("\t[OK]");
             int idSession = 0;
 
             //Abrimos servidores de horoscopo, pronostico
-            ((ServidorH) new ServidorH(s_horoscopo, PORT_SERVER_H)).start();
-            ((ServidorP) new ServidorP(s_pronostico, PORT_SERVER_P)).start();
-            //estos estarán "escuchando" hasta que llegue un nuevo cliente
+            ((ServidorH) new ServidorH(s_horoscopo, Config.PUERTO_SERVIDOR_HOROSCOPO)).start();
+            ((ServidorP) new ServidorP(s_pronostico, Config.PUERTO_SERVIDOR_PRONOSTICO)).start();
+            //Estos servidores estarán "escuchando" hasta que llegue un nuevo cliente
             while (true) {
                 try{
                     Socket socket;
-                    ss.setSoTimeout(5000); //5 segundos esperando nuevas conexiones
-                    socket = ss.accept(); //aceptamos la conexión, redirigimos hacia un nuevo hilo que controle la petición.
+                    ss.setSoTimeout(Config.SO_TIMEOUT_SERVIDOR_CENTRAL); //5 segundos esperando nuevas conexiones
+                    socket = ss.accept(); // Aceptamos la conexión, redirigimos hacia un nuevo hilo que controle la petición.
                     System.out.println("Nueva conexión entrante: " + socket);
 
                     //Este Servidor buscará la información en los otros servidores para cada cliente 
-                    ((ServidorHilo) new ServidorHilo(socket, PORT_SERVER_H, PORT_SERVER_P, idSession)).start();
+                    ((ServidorHilo) new ServidorHilo(socket, Config.PUERTO_SERVIDOR_HOROSCOPO, Config.PUERTO_SERVIDOR_PRONOSTICO, idSession)).start();
                     idSession++;        
                 } catch (SocketTimeoutException e){
-                    System.out.println("Sin actividad por 5 segundos. Cerrando servidor...");
+                    System.out.println("Sin actividad por "+(Config.SO_TIMEOUT_SERVIDOR_CENTRAL / 1000)+" segundos. Cerrando servidor...");
                     break;
                 }
             }

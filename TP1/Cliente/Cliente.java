@@ -4,6 +4,7 @@ import java.net.Socket;
 import java.util.*;
 import java.util.logging.*;
 
+
 class Persona extends Thread {
 
     protected Socket socket;
@@ -38,8 +39,8 @@ class Persona extends Thread {
 
     public Persona(int id) {
         this.id = id;
-        this.PORT = 5000;
-        this.IP_SERVER = "localhost";
+        this.PORT = Config.PUERTO_SERVIDOR_CENTRAL;
+        this.IP_SERVER = Config.IP_SERVIDOR_CENTRAL;
     }
 
     @Override

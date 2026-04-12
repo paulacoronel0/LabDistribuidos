@@ -1,4 +1,3 @@
-
 import java.io.*;
 import java.net.*;
 import java.time.LocalDate;
@@ -10,7 +9,7 @@ import java.util.logging.*;
 
 public class ServidorHilo extends Thread {
 
-    //ServidorHilo actuará como "INTERMEDIARIO" entre la consulta del cliente y la respuesta de los servidores horoscopo, pronostico
+    //ServidorHilo actuará como "INTERMEDIARIO" entre la consulta del cliente y la respuesta de los servidores horoscopo y pronostico
     private int port_h; //puerto horoscopo
     private int port_p; //puerto pronostico
     private Socket socket_cliente; //socket del cliente
@@ -36,7 +35,7 @@ public class ServidorHilo extends Thread {
         this.port_p = port_p;
         this.socket_cliente = socket_cliente;
         this.id_session = id;
-        this.ip = "localhost";
+        this.ip = Config.IP_SERVIDOR_CENTRAL; 
 
         try {
             this.socket_h = new Socket(this.ip, port_h);
@@ -68,55 +67,53 @@ public class ServidorHilo extends Thread {
         String request;
         String[] consultas; //una consulta para cada server
         try {
-            //si recibe nulo, quiere decir que el cliente cerró conexión
+            // Si recibe nulo, quiere decir que el cliente cerró conexión
             while ((request = input_cliente.readLine()) != null) {
                 try {
-                    //se lee la petición del cliente
-                    //request = input_cliente.readLine();
+                    //Se lee la petición del cliente
                     System.out.println("\tServidor " + id_session + "> recibio: " + request);
 
                     if (!request.contains(";")) {
                         output_cliente.println("\tServidor " + id_session + "> Error: Formato incorrecto. Use signo;fecha");
                         continue;
                     }
-                    //se la divide
+                    // Se divide la petición
                     consultas = request.split(";");
-                    //ej: "aries 25/12" "aries" "25/12"    
+                    // Ej: "aries 25/12" "aries" "25/12"    
                     String signo = consultas[0].trim();
                     String fecha = consultas[1].trim();
-                    /*luego, verificamos que el signo y la fecha sean válidos 
+                    /* Luego, verificamos que el signo y la fecha sean válidos 
                     (en nuestro caso, no deberia pasar, pero será útil si dejamos que el cliente ingrese cualquier solicitud)*/
                     if (!esSignoValido(signo)) {
                         output_cliente.println("\tServidor " + id_session + "> Error: El signo '" + signo + "' no es válido.");
                         continue;
                     }
-
                     if (!esFechaValida(fecha)) {
                         output_cliente.println("\tServidor " + id_session + "> Error: La fecha '" + fecha + "' es inválida o tiene formato incorrecto (use dd/mm/yyyy).");
                         continue;
                     }
                     //Para consulta 1 (horoscopo):
-                    //envia petición al server encargado del horoscopo.
+                    // Envia petición al server encargado del horoscopo.
                     output_horoscopo.println(signo);
                     output_horoscopo.flush(); // fuerza el envio inmediato de datos hacia ServidorH
-                    //captura respuesta e imprime (debug)
+                    // Captura respuesta e imprime (debug)
                     String respuesta_h = input_horoscopo.readLine();
                     if (respuesta_h != null) {
                         System.out.println("\tServidor " + id_session + "> " + respuesta_h);
                     }
 
-                    //Para consulta 2 (pronostico):
-                    //envia petición al server encargado del pronostico.
+                    // Para consulta 2 (pronostico):
+                    // Envia petición al server encargado del pronostico.
                     output_pronostico.println(fecha);
                     output_pronostico.flush(); // fuerza el envio inmediato de datos hacia ServidorP
-                    //captura respuesta e imprime (debug)
+                    // Captura respuesta e imprime (debug)
                     String respuesta_p = input_pronostico.readLine();
                     if (respuesta_p != null) {
                         System.out.println("\tServidor " + id_session + "> " + respuesta_p);
                     }
                     // Recibe y combina ambas respuestas
                     String respuesta = respuesta_h + "- " + respuesta_p;
-                    // luego, envia al cliente la respuesta completa
+                    // Luego, envia al cliente la respuesta completa
                     output_cliente.flush();// fuerza el envio inmediato de datos hacia el cliente
                     output_cliente.println(respuesta);
 
@@ -134,6 +131,7 @@ public class ServidorHilo extends Thread {
     }
 
     //Métodos de validación:
+    
     public static boolean esSignoValido(String signo) {
         if (signo == null) {
             return false;
