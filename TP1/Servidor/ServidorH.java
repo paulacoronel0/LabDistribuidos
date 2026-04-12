@@ -1,10 +1,12 @@
 
+/**
+ * @author Paula Coronel, Antonio Sarmiento
+ */
 import java.io.*;
 import java.net.*;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.concurrent.ConcurrentHashMap;
-
 
 public class ServidorH extends Thread {
 
@@ -71,7 +73,6 @@ public class ServidorH extends Thread {
             entrada = null;      // Luego, forzamos a que lo genere de nuevo si fuera el caso.
         }
 
-        // BORRAR LUEGO, PRUEBA CACHÉ
         if (entrada != null) {
             System.out.println("\nServidorHoroscopo> Dato CACHÉ: " + llave + "-" + entrada.respuesta);
         }

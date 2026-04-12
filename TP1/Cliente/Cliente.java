@@ -1,9 +1,11 @@
 
+/**
+ * @author Paula Coronel, Antonio Sarmiento
+ */
 import java.io.*;
 import java.net.Socket;
 import java.util.*;
 import java.util.logging.*;
-
 
 class Persona extends Thread {
 
@@ -16,23 +18,10 @@ class Persona extends Thread {
     private int id; //identificador del cliente
 
     // Listas para generar peticiones aleatorias
-    /*
-    private final String[] SIGNOS = {
-        "Aries", "Tauro", "Geminis", "Cancer", "Leo", "Virgo",
-        "Libra", "Escorpio", "Sagitario", "Capricornio", "Acuario", "Piscis"
-    };
-     */
-    //probando caché
     private final String[] SIGNOS = {
         "Aries", "Tauro", "Leo"
     };
 
-    /*
-    private final String[] FECHAS = {
-        "10/01/2026", "15/05/2026", "20/12/2025", "01/01/2026", "28/02/2026"
-    };
-
-     */
     private final String[] FECHAS = {
         "10/01/2026", "15/05/2026"
     };

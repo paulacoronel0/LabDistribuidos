@@ -1,3 +1,7 @@
+
+/**
+ * @author Paula Coronel, Antonio Sarmiento
+ */
 import java.io.*;
 import java.net.*;
 import java.time.LocalDate;
@@ -35,7 +39,7 @@ public class ServidorHilo extends Thread {
         this.port_p = port_p;
         this.socket_cliente = socket_cliente;
         this.id_session = id;
-        this.ip = Config.IP_SERVIDOR_CENTRAL; 
+        this.ip = Config.IP_SERVIDOR_CENTRAL;
 
         try {
             this.socket_h = new Socket(this.ip, port_h);
@@ -131,7 +135,6 @@ public class ServidorHilo extends Thread {
     }
 
     //Métodos de validación:
-    
     public static boolean esSignoValido(String signo) {
         if (signo == null) {
             return false;
