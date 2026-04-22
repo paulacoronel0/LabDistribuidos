@@ -7,7 +7,6 @@ import java.util.logging.*;
 
 import ServicioCentral;
 
-
 class Persona extends Thread {
 
     private final int PORT;
@@ -15,7 +14,6 @@ class Persona extends Thread {
     private int id; //identificador del cliente
 
     // Listas para generar peticiones aleatorias
-    
     private final String[] SIGNOS = {
         "Aries", "Tauro", "Leo"
     };
@@ -44,15 +42,15 @@ class Persona extends Thread {
                 //la petición contiene lo pedido por el cliente y su identificador.
 
                 System.out.println("Cliente " + id + "> Enviando: " + signoAleatorio + ";" + fechaAleatoria);
-                
+
                 // Obtiene el Servicio
-                ServicioCentral servicioCentral = (ServicioCentral)Naming.lookup("//"+this.IP_SERVER+":"+this.PORT+"/ServicioCentralImp");
-                
+                ServicioCentral servicioCentral = (ServicioCentral) Naming.lookup("//" + this.IP_SERVER + ":" + this.PORT + "/ServicioCentral");
+
                 // Envia la consulta al ServicioCentral y obtiene la respuesta
                 String respuesta = servicioCentral.consultar(signoAleatorio, fechaAleatoria);
 
                 // Luego, lee la respuesta del ServidoCentral
-                System.out.println("Cliente " + id + ">  Recibió: "+ respuesta);
+                System.out.println("Cliente " + id + ">  Recibió: " + respuesta);
 
                 // Pequeña pausa de 1 segundo entre peticiones para ver el flujo
                 Thread.sleep(1000);
@@ -62,12 +60,12 @@ class Persona extends Thread {
 
         } catch (Exception ex) {
             Logger.getLogger(Persona.class.getName()).log(Level.SEVERE, null, ex);
-        } 
+        }
     }
 }
 
 public class Cliente {
-    
+
     public static void main(String[] args) {
         ArrayList<Thread> clients = new ArrayList<Thread>();
         //generamos los clientes y los ejecutamos

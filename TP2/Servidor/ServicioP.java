@@ -1,3 +1,4 @@
+
 import java.rmi.Naming;
 import java.rmi.RemoteException;
 import java.rmi.server.UnicastRemoteObject;
@@ -8,8 +9,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.concurrent.ConcurrentHashMap;
 
-
-public class ServicioP extends UnicastRemoteObject implements ServicioPrediccion{
+public class ServicioP extends UnicastRemoteObject implements ServicioPrediccion {
+    //Define la lógica del servicio pronostico (buscar la respuesta, caché)
 
     private ServerSocket socket;
     private int puerto;
@@ -85,5 +86,4 @@ public class ServicioP extends UnicastRemoteObject implements ServicioPrediccion
             return (System.currentTimeMillis() - tiempoCreacion) > ttl;
         }
     }
-
 }

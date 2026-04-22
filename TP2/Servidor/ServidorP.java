@@ -1,6 +1,9 @@
+
 import java.rmi.Naming;
 
 public class ServidorP {
+
+    //Define el registro RMI del objeto Servicio Pronostico
     public static void main(String[] args) {
         try {
             Naming.rebind(

@@ -1,3 +1,4 @@
+
 import java.rmi.Naming;
 import java.rmi.RemoteException;
 import java.rmi.server.UnicastRemoteObject;
@@ -8,8 +9,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.concurrent.ConcurrentHashMap;
 
-
 public class ServicioH extends UnicastRemoteObject implements ServicioPrediccion {
+    //Define la lógica del servicio horoscopo (buscar la respuesta, caché)
 
     private final String[] horoscopo = {
         "Enfoque en proyectos personales; éxito inminente.",
@@ -26,7 +27,7 @@ public class ServicioH extends UnicastRemoteObject implements ServicioPrediccion
     private static final ConcurrentHashMap<String, EntradaCache> cache = new ConcurrentHashMap<>();
     private final long TIEMPO_VIDA = Config.TIEMPO_VIDA_CACHE; // 60.000 ms = 1 minuto, 2min la caché almacenará el dato.
 
-    public ServicioH()  throws RemoteException{
+    public ServicioH() throws RemoteException {
         super();
         this.horoscopoList = new ArrayList<>();
         Collections.addAll(this.horoscopoList, this.horoscopo);
@@ -80,17 +81,6 @@ public class ServicioH extends UnicastRemoteObject implements ServicioPrediccion
         // Verifica si pasaron más de X milisegundos
         boolean expiro(long ttl) {
             return (System.currentTimeMillis() - this.tiempoCreacion) > ttl;
-        }
-    }
-
-    // Registramos servicioHoroscopo
-    public static void main(String[] args){
-        try {
-            Naming.rebind(
-                    "rmi://" + Config.IP_SERVIDOR_HOROSCOPO + ":" + Config.PUERTO_SERVIDOR_HOROSCOPO + "/ServicioH",
-                    new ServicioH());
-        } catch (Exception e) {
-            System.err.println("Error en ServidorH: " + e.getMessage());
         }
     }
 }

@@ -1,3 +1,4 @@
+
 import java.rmi.Naming;
 import java.rmi.RemoteException;
 import java.rmi.server.UnicastRemoteObject;
@@ -8,20 +9,19 @@ import java.time.format.ResolverStyle;
 import java.util.*;
 import java.util.logging.*;
 
-public class ServicioCentralImp extends UnicastRemoteObject implements ServicioCentral{
+public class ServicioCentralImp extends UnicastRemoteObject implements ServicioCentral {
 
     private static final Set<String> SIGNOS_VALIDOS = new HashSet<>(Arrays.asList(
             "aries", "tauro", "geminis", "cancer", "leo", "virgo",
             "libra", "escorpio", "sagitario", "capricornio", "acuario", "piscis"
     ));
-    
+
     public ServicioCentralImp() throws RemoteException {
         super();
     }
 
-
     @Override
-    public String consultar(String signo, String fecha){
+    public String consultar(String signo, String fecha) {
         String respuesta = "";
         //Se lee la petición del cliente
         /* Luego, verificamos que el signo y la fecha sean válidos 
@@ -36,17 +36,10 @@ public class ServicioCentralImp extends UnicastRemoteObject implements ServicioC
             respuesta = "Error: La fecha '" + fecha + "' es inválida o tiene formato incorrecto (use dd/mm/yyyy).";
             return respuesta;
         }
-        // Envia petición al servicio encargado del horoscopo.
-        //if (args.length!=1) { System.err.println("Uso: Servidor Puerto"); return; }
-        //    if (System.getSecurityManager() == null) {
-        	// System.setSecurityManager(new RMISecurityManager()); 
-	    //   	System.setProperty("java.rmi.server.hostname","localhost");}
-        
-        
         try {
             // Para consulta 1 (horoscopo):
             ServicioPrediccion servicioHConsulta = (ServicioPrediccion) Naming.lookup(
-                    "//" + Config.IP_SERVIDOR_HOROSCOPO + ":" + Config.PUERTO_SERVIDOR_HOROSCOPO + "/ServicioH"); 
+                    "//" + Config.IP_SERVIDOR_HOROSCOPO + ":" + Config.PUERTO_SERVIDOR_HOROSCOPO + "/ServicioH");
             String respuesta_h = servicioHConsulta.prediccion(signo);
             if (respuesta_h != null) {
                 System.out.println("\tServidor >" + respuesta_h);
@@ -63,17 +56,16 @@ public class ServicioCentralImp extends UnicastRemoteObject implements ServicioC
 
         } catch (RemoteException e) {
             System.err.println("Error de comunicacion: " + e.toString());
-            System.exit(1); 
+            System.exit(1);
         } catch (Exception e) {
             System.err.println("Excepcion en ServicioCentralImp:");
             e.printStackTrace();
-            System.exit(1); 
+            System.exit(1);
         }
         return respuesta;
     }
-    
+
     //Métodos de validación:
-    
     private static boolean esSignoValido(String signo) {
         if (signo == null) {
             return false;
