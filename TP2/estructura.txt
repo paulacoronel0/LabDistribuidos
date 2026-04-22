@@ -29,7 +29,7 @@ Cliente --> ServicioCentral (Interfaz) -->  ServicioPrediccion (Interfaz)
                     |
                 -------                                   |
                    |                                      |
-          ServidorCentral                         -------------------------
+ServidorCentral -->      ServicioCentralImp     -------------------------
                                                 |                    |
                                                 ServidorP           ServidorH
 
@@ -84,5 +84,4 @@ Resultado:
 
 El objeto queda disponible para clientes
 Los clientes pueden hacer lookup con ese nombre
-
 
