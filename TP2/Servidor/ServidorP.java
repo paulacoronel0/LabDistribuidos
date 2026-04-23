@@ -1,6 +1,8 @@
-
+package Servidor;
 import java.rmi.Naming;
 
+import Compartido.Config;
+import Compartido.ServicioCentral;
 public class ServidorP {
 
     //Define el registro RMI del objeto Servicio Pronostico

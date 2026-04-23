@@ -1,4 +1,7 @@
+package Servidor;
 
+import Compartido.Config;
+import Compartido.ServicioCentral;
 import java.rmi.Naming;
 
 public class ServidorH {

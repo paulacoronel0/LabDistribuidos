@@ -1,11 +1,12 @@
 
+package Cliente;
+import Compartido.Config;
+import Compartido.ServicioCentral;
 import java.io.*;
 import java.rmi.*;
 import java.util.ArrayList;
 import java.util.Random;
 import java.util.logging.*;
-
-import ServicioCentral;
 
 class Persona extends Thread {
 
