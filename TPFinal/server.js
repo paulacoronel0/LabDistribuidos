@@ -1,9 +1,10 @@
 const http = require('http');
 const WebSocketServer = require('websocket').server;
 
-// 1. Crear el servidor HTTP base
+// ── Servidor HTTP ─────────────────────────────────────────────────
+
 const server = http.createServer(function(request, response) {
-    console.log((new Date()) + ' Petición HTTP recibida para ' + request.url);
+    console.log((new Date()) + ' HTTP ' + request.url);
     response.writeHead(404);
     response.end();
 });
@@ -12,30 +13,37 @@ server.listen(8080, function() {
     console.log((new Date()) + ' Servidor escuchando en el puerto 8080');
 });
 
-// 2. Inicializar el Servidor WebSocket
+// ── WebSocket ─────────────────────────────────────────────────────
+
 const wsServer = new WebSocketServer({
     httpServer: server,
-    autoAcceptConnections: false // Recomendado por la cátedra para validar orígenes
+    autoAcceptConnections: false
 });
 
 function originIsAllowed(origin) {
-    return true; // Permitir cualquier origen para desarrollo local
+    return true;
 }
 
-// ── LÓGICA DEL JUEGO (ESTADO MUTABLE CENTRALIZADO) ────────────────
+// ── Estado global ─────────────────────────────────────────────────
 
-let waitingPlayer = null; // Jugador esperando en el lobby
-let rooms = [];           // Lista de salas activas
+let waitingPlayer = null;
+let rooms = [];
 
-// Combinaciones ganadoras tradicionales del Tateti
+// Map<connection, { room, symbol }>
+// Permite encontrar la sala y símbolo de cualquier conexión en O(1),
+// sin depender de closures ni de propiedades mutables en el objeto connection.
+const connectionState = new Map();
+
+// ── Lógica del juego ──────────────────────────────────────────────
+
 const WINNING_COMBOS = [
-    [0, 1, 2], [3, 4, 5], [6, 7, 8], // Horizontales
-    [0, 3, 6], [1, 4, 7], [2, 5, 8], // Verticales
-    [0, 4, 8], [2, 4, 6]             // Diagonales
+    [0, 1, 2], [3, 4, 5], [6, 7, 8],
+    [0, 3, 6], [1, 4, 7], [2, 5, 8],
+    [0, 4, 8], [2, 4, 6]
 ];
 
 function checkWinner(board) {
-    for (let combo of WINNING_COMBOS) {
+    for (const combo of WINNING_COMBOS) {
         const [a, b, c] = combo;
         if (board[a] && board[a] === board[b] && board[a] === board[c]) {
             return { winner: board[a], line: combo };
@@ -47,147 +55,155 @@ function checkWinner(board) {
     return null;
 }
 
-// ── MANEJO DE CONEXIONES ──────────────────────────────────────────
+function send(connection, obj) {
+    if (connection.connected) {
+        connection.sendUTF(JSON.stringify(obj));
+    }
+}
+
+function broadcast(room, obj) {
+    room.players.forEach(p => send(p.connection, obj));
+}
+
+function resetRoom(room) {
+    room.board        = Array(9).fill(null);
+    room.turn         = 'X';
+    room.rematchVotes = 0;
+}
+
+// ── Conexiones ────────────────────────────────────────────────────
 
 wsServer.on('request', function(request) {
     if (!originIsAllowed(request.origin)) {
         request.reject();
-        console.log((new Date()) + ' Conexión del origen ' + request.origin + ' rechazada.');
         return;
     }
 
-    // Aceptar la conexión usando el protocolo que definió tu frontend
-    const connection = request.accept(null, request.origin); // Como no tenemos protocolos específicos, pasamos null
-    console.log((new Date()) + ' Nuevo jugador conectado.');
-
-    // Variables asociadas a esta conexión en particular
-    let currentRoom = null;
-    let mySymbol = null;
-
-    // Asegúrate de que las variables globales en la parte superior del archivo estén así:
-    let waitingPlayer = null; 
-    let rooms = []; // Para soportar múltiples salas si fuera necesario
-
-    // ... dentro de wsServer.on('request', function(request) { ...
-    // var connection = request.accept('echo-protocol', request.origin);
+    const connection = request.accept(null, request.origin);
+    console.log((new Date()) + ' Jugador conectado: ' + connection.remoteAddress);
 
     connection.on('message', function(message) {
         if (message.type !== 'utf8') return;
-        
+
         let msg;
-        try {
-            msg = JSON.parse(message.utf8Data);
-        } catch (e) {
-            return;
-        }
+        try { msg = JSON.parse(message.utf8Data); }
+        catch (e) { return; }
 
         switch (msg.type) {
-            case 'join_room':
-                // Evitar que un jugador se empareje consigo mismo al recargar
-                if (waitingPlayer && waitingPlayer.connection === connection) {
-                    return;
-                }
+
+            case 'join_room': {
+                if (waitingPlayer && waitingPlayer.connection === connection) return;
 
                 if (waitingPlayer && waitingPlayer.connection.connected) {
-                    // Ya había alguien esperando, armamos la sala
+                    // Segundo jugador: armamos la sala
                     const p1 = waitingPlayer;
-                    const p2 = { connection: connection, symbol: 'O' };
-                    p1.symbol = 'X';
+                    const p2 = { connection, symbol: 'O' };
 
-                    const newRoom = {
-                        players: [p1, p2],
-                        board: Array(9).fill(null),
-                        turn: 'X'
+                    const room = {
+                        players:      [p1, p2],
+                        board:        Array(9).fill(null),
+                        turn:         'X',
+                        rematchVotes: 0
                     };
 
-                    rooms.push(newRoom);
+                    rooms.push(room);
+                    waitingPlayer = null;
 
-                    // ── CRUCIAL: Guardamos la referencia de la sala EN AMBOS objetos de conexión ──
-                    p1.connection.roomRef = newRoom;
-                    p2.connection.roomRef = newRoom;
-                    
-                    // También les asignamos su símbolo por si lo requiere la lógica
-                    p1.connection.mySymbol = 'X';
-                    p2.connection.mySymbol = 'O';
+                    // Registrar AMBAS conexiones en el Map
+                    connectionState.set(p1.connection, { room, symbol: 'X' });
+                    connectionState.set(p2.connection, { room, symbol: 'O' });
 
-                    waitingPlayer = null; // Vaciamos el lobby
+                    // Notificar individualmente (cada uno necesita saber su símbolo)
+                    send(p1.connection, { type: 'game_start', board: room.board, turn: room.turn, symbol: 'X' });
+                    send(p2.connection, { type: 'game_start', board: room.board, turn: room.turn, symbol: 'O' });
 
-                    // Notificamos a ambos clientes que la partida inició
-                    p1.connection.sendUTF(JSON.stringify({ type: 'game_start', board: newRoom.board, turn: newRoom.turn, symbol: 'X' }));
-                    p2.connection.sendUTF(JSON.stringify({ type: 'game_start', board: newRoom.board, turn: newRoom.turn, symbol: 'O' }));
+                    console.log('Sala creada: X vs O');
 
-                    console.log(`Sala iniciada con DOS jugadores reales: (X) vs (O)`);
                 } else {
-                    // Primer jugador en llegar, se queda esperando en el lobby
-                    waitingPlayer = { connection: connection, symbol: 'X' };
-                    connection.mySymbol = 'X';
-                    connection.sendUTF(JSON.stringify({ type: 'waiting', symbol: 'X' }));
-                    console.log('Jugador X esperando oponente legítimo...');
+                    // Primer jugador: queda en el lobby
+                    waitingPlayer = { connection, symbol: 'X' };
+                    connectionState.set(connection, { room: null, symbol: 'X' });
+                    send(connection, { type: 'waiting', symbol: 'X' });
+                    console.log('Jugador X esperando oponente...');
                 }
                 break;
+            }
 
-            case 'move':
-                // ── SOLUCIÓN AL ERROR: Buscamos la sala desde la conexión que emitió el mensaje ──
-                const playerRoom = connection.roomRef; 
-                const playerSymbol = connection.mySymbol;
+            case 'move': {
+                const state = connectionState.get(connection);
+                if (!state || !state.room) return;
 
-                if (!playerRoom) {
-                    console.log(`Jugador ${playerSymbol || 'Desconocido'} intentó mover sin estar en una sala.`);
+                const { room, symbol } = state;
+
+                if (room.turn !== symbol) {
+                    send(connection, { type: 'error', msg: 'No es tu turno' });
                     return;
                 }
 
-                // Validar que sea el turno del jugador correcto
-                if (playerRoom.turn !== playerSymbol) {
-                    console.log(`Jugador ${playerSymbol} intentó mover pero no es su turno.`);
+                const idx = msg.cell;
+                if (idx < 0 || idx > 8 || room.board[idx] !== null) {
+                    send(connection, { type: 'error', msg: 'Celda inválida u ocupada' });
                     return;
                 }
 
-                const cellIdx = msg.cell;
-                // Validar que la celda esté vacía
-                if (playerRoom.board[cellIdx] !== null) {
-                    console.log(`Celda ${cellIdx} ya está ocupada.`);
-                    return;
+                room.board[idx] = symbol;
+                console.log(`Jugador ${symbol} jugó en celda ${idx}`);
+
+                const result = checkWinner(room.board);
+
+                if (result) {
+                    broadcast(room, {
+                        type:   'game_over',
+                        board:  room.board,
+                        winner: result.winner || null,
+                        line:   result.line   || null
+                    });
+                    console.log(result.winner ? `Ganó ${result.winner}` : 'Empate');
+                } else {
+                    room.turn = room.turn === 'X' ? 'O' : 'X';
+                    broadcast(room, { type: 'state', board: room.board, turn: room.turn });
                 }
-
-                // Impactamos el movimiento en el tablero real de la sala
-                playerRoom.board[cellIdx] = playerSymbol;
-                console.log(`Jugador ${playerSymbol} hizo un movimiento exitoso en la celda ${cellIdx}`);
-
-                // Cambiamos el turno reactivamente
-                playerRoom.turn = playerRoom.turn === 'X' ? 'O' : 'X';
-
-                // "Empujamos" el nuevo estado de forma síncrona a ambos participantes
-                playerRoom.players.forEach(p => {
-                    if (p.connection.connected) {
-                        p.connection.sendUTF(JSON.stringify({
-                            type: 'state',
-                            board: playerRoom.board,
-                            turn: playerRoom.turn
-                        }));
-                    }
-                });
                 break;
-                
-            // ... (resto de los casos como 'rematch')
+            }
+
+            case 'rematch': {
+                const state = connectionState.get(connection);
+                if (!state || !state.room) return;
+
+                const { room } = state;
+                room.rematchVotes++;
+                console.log(`Votos de revancha: ${room.rematchVotes}/2`);
+
+                if (room.rematchVotes >= 2) {
+                    resetRoom(room);
+                    send(room.players[0].connection, { type: 'game_start', board: room.board, turn: room.turn, symbol: 'X' });
+                    send(room.players[1].connection, { type: 'game_start', board: room.board, turn: room.turn, symbol: 'O' });
+                    console.log('Revancha iniciada');
+                } else {
+                    send(connection, { type: 'waiting', symbol: state.symbol });
+                }
+                break;
+            }
         }
     });
 
-    // Manejar desconexiones inesperadas limpiamente sin bloquear recursos
-    connection.on('close', function(reasonCode, description) {
-        console.log((new Date()) + ' Peer ' + connection.remoteAddress + ' desconectado.');
+    connection.on('close', function() {
+        console.log((new Date()) + ' Jugador desconectado: ' + connection.remoteAddress);
 
         if (waitingPlayer && waitingPlayer.connection === connection) {
             waitingPlayer = null;
         }
 
-        if (currentRoom) {
-            // Notificar al oponente que se quedó solo
-            const opponent = currentRoom.players.find(p => p.connection !== connection);
+        const state = connectionState.get(connection);
+        if (state && state.room) {
+            const room     = state.room;
+            const opponent = room.players.find(p => p.connection !== connection);
             if (opponent && opponent.connection.connected) {
-                opponent.connection.sendUTF(JSON.stringify({ type: 'opponent_left' }));
+                send(opponent.connection, { type: 'opponent_left' });
             }
-            // Eliminar la sala activa del índice de memoria
-            rooms = rooms.filter(r => r !== currentRoom);
+            rooms = rooms.filter(r => r !== room);
         }
+
+        connectionState.delete(connection);
     });
 });

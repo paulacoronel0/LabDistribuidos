@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Tateti</title>
-<script type="text/javascript" src="server.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Space+Mono:wght@700&display=swap');
 
@@ -381,6 +380,8 @@
         break;
 
       case 'game_start':
+        mySymbol = msg.symbol;        // ← asignar ANTES de calcular myTurn
+        updateMySymbol();
         hideOverlay();
         renderBoard(msg.board);
         myTurn   = msg.turn === mySymbol;
