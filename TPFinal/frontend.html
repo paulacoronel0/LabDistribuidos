@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tateti</title>
+<script type="text/javascript" src="server.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Space+Mono:wght@700&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:       #0f0f13;
+    --surface:  #1a1a22;
+    --border:   #2e2e3e;
+    --x-color:  #e8523a;
+    --o-color:  #4a9eff;
+    --text:     #f0eeea;
+    --muted:    #7a788a;
+    --cell-bg:  #16161f;
+    --cell-hover: #1e1e2a;
+    --win-line: #ffd166;
+    --radius:   12px;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Space Grotesk', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 28px;
+    padding: 24px;
+  }
+
+  h1 {
+    font-family: 'Space Mono', monospace;
+    font-size: clamp(2rem, 6vw, 3.2rem);
+    letter-spacing: -1px;
+    color: var(--text);
+  }
+  h1 span.x { color: var(--x-color); }
+  h1 span.o { color: var(--o-color); }
+
+  /* Status bar */
+  #status-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    height: 48px;
+    min-width: 300px;
+    justify-content: center;
+  }
+
+  #status-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: var(--muted);
+    transition: background 0.3s;
+    flex-shrink: 0;
+  }
+  #status-dot.x   { background: var(--x-color); }
+  #status-dot.o   { background: var(--o-color); }
+  #status-dot.win { background: var(--win-line); }
+
+  #status-text {
+    font-size: 1rem;
+    color: var(--muted);
+    transition: color 0.3s;
+    font-weight: 500;
+  }
+  #status-text.active { color: var(--text); }
+
+  /* Symbol badge */
+  #my-symbol {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.78rem;
+    padding: 3px 10px;
+    border-radius: 20px;
+    border: 1.5px solid var(--border);
+    color: var(--muted);
+    display: none;
+  }
+  #my-symbol.x { border-color: var(--x-color); color: var(--x-color); }
+  #my-symbol.o { border-color: var(--o-color); color: var(--o-color); }
+
+  /* Board */
+  #board-wrap {
+    position: relative;
+  }
+
+  #board {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    background: var(--border);
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
+    padding: 6px;
+  }
+
+  .cell {
+    width: clamp(90px, 22vw, 120px);
+    height: clamp(90px, 22vw, 120px);
+    background: var(--cell-bg);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.1s;
+    user-select: none;
+    position: relative;
+    overflow: hidden;
+  }
+  .cell:hover:not(.taken):not(.disabled) {
+    background: var(--cell-hover);
+    transform: scale(1.03);
+  }
+  .cell.taken { cursor: default; }
+  .cell.disabled { cursor: not-allowed; }
+
+  /* X and O drawn with SVG-like CSS */
+  .cell-symbol {
+    font-family: 'Space Mono', monospace;
+    font-size: clamp(2.2rem, 7vw, 3rem);
+    font-weight: 700;
+    line-height: 1;
+    opacity: 0;
+    transform: scale(0.4);
+    transition: opacity 0.2s ease, transform 0.25s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  .cell-symbol.show {
+    opacity: 1;
+    transform: scale(1);
+  }
+  .cell-symbol.X { color: var(--x-color); }
+  .cell-symbol.O { color: var(--o-color); }
+
+  .cell.win-cell {
+    background: #1f1c0a;
+  }
+  .cell.win-cell .cell-symbol {
+    color: var(--win-line);
+  }
+
+  /* Ghost preview on hover */
+  .cell:not(.taken):not(.disabled):hover .cell-symbol.ghost {
+    opacity: 0.18;
+    transform: scale(1);
+  }
+
+  /* Connection overlay */
+  #overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(15,15,19,0.88);
+    border-radius: var(--radius);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    backdrop-filter: blur(2px);
+    transition: opacity 0.3s;
+  }
+  #overlay.hidden { opacity: 0; pointer-events: none; }
+
+  #overlay-text {
+    font-size: 0.95rem;
+    color: var(--muted);
+    text-align: center;
+    max-width: 200px;
+    line-height: 1.5;
+  }
+
+  .spinner {
+    width: 28px; height: 28px;
+    border: 2.5px solid var(--border);
+    border-top-color: var(--o-color);
+    border-radius: 50%;
+    animation: spin 0.9s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) {
+    .spinner { animation: none; border-top-color: var(--muted); }
+  }
+
+  /* Rematch button */
+  #rematch-btn {
+    display: none;
+    background: transparent;
+    border: 2px solid var(--border);
+    color: var(--text);
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 700;
+    padding: 10px 28px;
+    border-radius: 40px;
+    cursor: pointer;
+    letter-spacing: 0.5px;
+    transition: border-color 0.2s, color 0.2s, transform 0.1s;
+  }
+  #rematch-btn:hover {
+    border-color: var(--text);
+    transform: translateY(-1px);
+  }
+  #rematch-btn.visible { display: block; }
+
+  /* Score */
+  #score {
+    display: flex;
+    gap: 32px;
+    font-family: 'Space Mono', monospace;
+  }
+  .score-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+  .score-label {
+    font-size: 0.7rem;
+    color: var(--muted);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .score-label.x { color: var(--x-color); }
+  .score-label.o { color: var(--o-color); }
+  .score-num {
+    font-size: 1.8rem;
+    color: var(--text);
+    line-height: 1;
+    transition: transform 0.2s;
+  }
+  .score-num.bump {
+    animation: bump 0.3s ease;
+  }
+  @keyframes bump {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.4); }
+    100% { transform: scale(1); }
+  }
+
+  /* Connection info */
+  #conn-info {
+    font-size: 0.75rem;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  #conn-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--muted);
+    transition: background 0.3s;
+  }
+  #conn-dot.connected { background: #3db87a; }
+  #conn-dot.error { background: var(--x-color); }
+</style>
+</head>
+<body>
+
+<h1>ta<span class="x">te</span><span class="o">ti</span></h1>
+
+<div id="status-bar">
+  <div id="status-dot"></div>
+  <span id="status-text">Conectando al servidor...</span>
+  <span id="my-symbol"></span>
+</div>
+
+<div id="board-wrap">
+  <div id="board">
+    <div class="cell disabled" data-cell="0"><span class="cell-symbol"></span></div>
+    <div class="cell disabled" data-cell="1"><span class="cell-symbol"></span></div>
+    <div class="cell disabled" data-cell="2"><span class="cell-symbol"></span></div>
+    <div class="cell disabled" data-cell="3"><span class="cell-symbol"></span></div>
+    <div class="cell disabled" data-cell="4"><span class="cell-symbol"></span></div>
+    <div class="cell disabled" data-cell="5"><span class="cell-symbol"></span></div>
+    <div class="cell disabled" data-cell="6"><span class="cell-symbol"></span></div>
+    <div class="cell disabled" data-cell="7"><span class="cell-symbol"></span></div>
+    <div class="cell disabled" data-cell="8"><span class="cell-symbol"></span></div>
+  </div>
+
+  <div id="overlay">
+    <div class="spinner"></div>
+    <p id="overlay-text">Esperando conexión...</p>
+  </div>
+</div>
+
+<button id="rematch-btn">Revancha</button>
+
+<div id="score">
+  <div class="score-item">
+    <span class="score-label x">X</span>
+    <span class="score-num" id="score-x">0</span>
+  </div>
+  <div class="score-item">
+    <span class="score-label" style="color:var(--muted)">Empate</span>
+    <span class="score-num" id="score-tie">0</span>
+  </div>
+  <div class="score-item">
+    <span class="score-label o">O</span>
+    <span class="score-num" id="score-o">0</span>
+  </div>
+</div>
+
+<div id="conn-info">
+  <div id="conn-dot"></div>
+  <span id="conn-text">desconectado</span>
+</div>
+
+<script>
+  const WS_URL = 'ws://localhost:8080';
+
+  const cells      = document.querySelectorAll('.cell');
+  const overlay    = document.getElementById('overlay');
+  const overlayTxt = document.getElementById('overlay-text');
+  const statusDot  = document.getElementById('status-dot');
+  const statusTxt  = document.getElementById('status-text');
+  const mySymbolEl = document.getElementById('my-symbol');
+  const rematchBtn = document.getElementById('rematch-btn');
+  const scoreX     = document.getElementById('score-x');
+  const scoreO     = document.getElementById('score-o');
+  const scoreTie   = document.getElementById('score-tie');
+  const connDot    = document.getElementById('conn-dot');
+  const connTxt    = document.getElementById('conn-text');
+
+  let ws       = null;
+  let mySymbol = null;
+  let myTurn   = false;
+  let gameOver = false;
+  let score    = { X: 0, O: 0, tie: 0 };
+
+  function connect() {
+    setConnStatus('connecting');
+    ws = new WebSocket(WS_URL);
+
+    ws.onopen = () => {
+      setConnStatus('connected');
+      send({ type: 'join_room' });
+    };
+
+    ws.onmessage = (e) => {
+      let msg;
+      try { msg = JSON.parse(e.data); } catch { return; }
+      handleMessage(msg);
+    };
+
+    ws.onclose = () => {
+      setConnStatus('disconnected');
+      showOverlay('Conexión perdida. Recargá para reconectar.');
+      setStatus('', 'Desconectado');
+      disableAll();
+    };
+
+    ws.onerror = () => {
+      setConnStatus('error');
+    };
+  }
+
+  function send(obj) {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify(obj));
+    }
+  }
+
+  function handleMessage(msg) {
+    switch (msg.type) {
+
+      case 'waiting':
+        mySymbol = msg.symbol;
+        updateMySymbol();
+        showOverlay('Esperando al otro jugador...');
+        setStatus('', 'En sala — esperando oponente');
+        break;
+
+      case 'game_start':
+        hideOverlay();
+        renderBoard(msg.board);
+        myTurn   = msg.turn === mySymbol;
+        gameOver = false;
+        rematchBtn.classList.remove('visible');
+        updateTurnStatus(msg.turn);
+        enableCells(msg.board);
+        break;
+
+      case 'state':
+        renderBoard(msg.board);
+        myTurn   = msg.turn === mySymbol;
+        gameOver = false;
+        updateTurnStatus(msg.turn);
+        enableCells(msg.board);
+        break;
+
+      case 'game_over':
+        renderBoard(msg.board);
+        gameOver = true;
+        myTurn   = false;
+        disableAll();
+        if (msg.winner) {
+          highlightWin(msg.line);
+          const isMe = msg.winner === mySymbol;
+          setStatus('win', isMe ? 'Ganaste!' : 'Perdiste...');
+          updateScore(msg.winner);
+        } else {
+          setStatus('', 'Empate');
+          updateScore(null);
+        }
+        setTimeout(() => rematchBtn.classList.add('visible'), 600);
+        break;
+
+      case 'error':
+        flashError(msg.msg);
+        break;
+
+      case 'opponent_left':
+        showOverlay('El oponente se fue.\nEsperando nuevo jugador...');
+        setStatus('', 'Oponente desconectado');
+        disableAll();
+        break;
+    }
+  }
+
+  // ── Render ──────────────────────────────────────────
+
+  function renderBoard(board) {
+    cells.forEach((cell, i) => {
+      const sym = board[i];
+      const span = cell.querySelector('.cell-symbol');
+      if (sym && span.textContent !== sym) {
+        span.textContent = sym;
+        span.className   = `cell-symbol ${sym}`;
+        requestAnimationFrame(() => span.classList.add('show'));
+        cell.classList.add('taken');
+        cell.classList.remove('disabled');
+      } else if (!sym) {
+        span.textContent = '';
+        span.className   = 'cell-symbol';
+        cell.classList.remove('taken', 'win-cell');
+      }
+    });
+  }
+
+  function enableCells(board) {
+    cells.forEach((cell, i) => {
+      cell.classList.remove('disabled');
+      if (board[i] || !myTurn) {
+        cell.classList.add('disabled');
+      }
+    });
+  }
+
+  function disableAll() {
+    cells.forEach(c => c.classList.add('disabled'));
+  }
+
+  function highlightWin(line) {
+    if (!line) return;
+    line.forEach(i => cells[i].classList.add('win-cell'));
+  }
+
+  // ── Status ───────────────────────────────────────────
+
+  function updateTurnStatus(turn) {
+    const isMe = turn === mySymbol;
+    const sym  = turn.toLowerCase();
+    setStatus(sym, isMe ? 'Tu turno' : 'Turno del oponente');
+  }
+
+  function setStatus(dotClass, text) {
+    statusDot.className = dotClass;
+    statusTxt.textContent = text;
+    statusTxt.className = dotClass ? 'active' : '';
+  }
+
+  function updateMySymbol() {
+    if (!mySymbol) return;
+    const cls = mySymbol.toLowerCase();
+    mySymbolEl.textContent = `Jugás con ${mySymbol}`;
+    mySymbolEl.className   = cls;
+    mySymbolEl.style.display = 'block';
+  }
+
+  function updateScore(winner) {
+    let el, key;
+    if (winner === 'X')     { key = 'X'; el = scoreX; }
+    else if (winner === 'O') { key = 'O'; el = scoreO; }
+    else                     { key = 'tie'; el = scoreTie; }
+    score[key]++;
+    el.textContent = score[key];
+    el.classList.remove('bump');
+    void el.offsetWidth;
+    el.classList.add('bump');
+  }
+
+  function flashError(msg) {
+    statusTxt.textContent = msg;
+    statusTxt.style.color = 'var(--x-color)';
+    setTimeout(() => {
+      statusTxt.style.color = '';
+      updateTurnStatus(mySymbol);
+    }, 1500);
+  }
+
+  // ── Overlay ──────────────────────────────────────────
+
+  function showOverlay(text) {
+    overlayTxt.textContent = text;
+    overlay.classList.remove('hidden');
+  }
+
+  function hideOverlay() {
+    overlay.classList.add('hidden');
+  }
+
+  // ── Connection indicator ──────────────────────────────
+
+  function setConnStatus(s) {
+    connDot.className = s === 'connected' ? 'connected' : s === 'error' ? 'error' : '';
+    connTxt.textContent = s === 'connected' ? `conectado a ${WS_URL}` : s === 'connecting' ? 'conectando...' : s === 'error' ? 'error de conexión' : 'desconectado';
+  }
+
+  // ── Interactions ──────────────────────────────────────
+
+  cells.forEach(cell => {
+    cell.addEventListener('click', () => {
+      if (cell.classList.contains('disabled') || cell.classList.contains('taken') || gameOver) return;
+      const idx = parseInt(cell.dataset.cell);
+      send({ type: 'move', cell: idx });
+    });
+
+    cell.addEventListener('mouseenter', () => {
+      if (cell.classList.contains('taken') || cell.classList.contains('disabled') || !myTurn || gameOver) return;
+      const span = cell.querySelector('.cell-symbol');
+      if (!span.textContent) {
+        span.textContent = mySymbol;
+        span.className   = `cell-symbol ${mySymbol} ghost`;
+      }
+    });
+
+    cell.addEventListener('mouseleave', () => {
+      const span = cell.querySelector('.cell-symbol');
+      if (span.classList.contains('ghost')) {
+        span.textContent = '';
+        span.className   = 'cell-symbol';
+      }
+    });
+  });
+
+  rematchBtn.addEventListener('click', () => {
+    send({ type: 'rematch' });
+    rematchBtn.classList.remove('visible');
+    setStatus('', 'Esperando revancha...');
+  });
+
+  // ── Init ──────────────────────────────────────────────
+
+  showOverlay('Conectando al servidor...');
+  connect();
+</script>
+</body>
+</html>
