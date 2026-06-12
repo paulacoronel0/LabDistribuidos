@@ -1,3 +1,5 @@
+
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -8,18 +10,18 @@
   @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Space+Mono:wght@700&display=swap');
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
+  /*CSS*/
   :root {
     --bg:       #0f0f13;
     --surface:  #1a1a22;
     --border:   #2e2e3e;
-    --x-color:  #e8523a;
-    --o-color:  #4a9eff;
+    --x-color:  #e8523a; /*Rojo para X*/
+    --o-color:  #4a9eff; /*Azul para O*/
     --text:     #f0eeea;
     --muted:    #7a788a;
     --cell-bg:  #16161f;
     --cell-hover: #1e1e2a;
-    --win-line: #ffd166;
+    --win-line: #ffd166; /*Amarillo para la linea ganadora*/
     --radius:   12px;
   }
 
@@ -314,8 +316,13 @@
   <span id="conn-text">desconectado</span>
 </div>
 
+<script src="config.js"></script>
+
 <script>
-  const WS_URL = 'ws://localhost:8080';
+  
+  /*Parte JScript*/
+  const WS_URL = `ws://${CONFIG.SERVER_IP}:${CONFIG.WS_PORT}`
+  //const WS_URL = 'ws://localhost:8080';
 
   const cells      = document.querySelectorAll('.cell');
   const overlay    = document.getElementById('overlay');
@@ -330,110 +337,130 @@
   const connDot    = document.getElementById('conn-dot');
   const connTxt    = document.getElementById('conn-text');
 
-  let ws       = null;
-  let mySymbol = null;
-  let myTurn   = false;
-  let gameOver = false;
-  let score    = { X: 0, O: 0, tie: 0 };
+  let ws       = null; //la conexión WebSocket
+  let miSimbolo = null; //'X' / 'O'
+  let miTurno   = false; // Si es mi turno o no
+  let juegoTerminado = false; //si el juego terminó
+  let puntaje    = { X: 0, O: 0, empate: 0 }; //Puntaje inicial (aparece abajo del tablero)
 
-  function connect() {
-    setConnStatus('connecting');
+  
+ //Manejo de conexiones:
+  function conectar() {
+    //Crea la conexión WS con el servidor (esta en puerto 8080)
+    estadoConexion('connecting');
     ws = new WebSocket(WS_URL);
-
+    //Una vez se establece conexión, solicita unirse a una sala de juego. 
     ws.onopen = () => {
-      setConnStatus('connected');
-      send({ type: 'join_room' });
+      estadoConexion('connected');
+      enviar({ type: 'unirse_a_sala' });
     };
-
+    //queda esperando por mensajes desde el servidor, que su respuesta en web va a ser manejado por el controladorMensajes
     ws.onmessage = (e) => {
       let msg;
       try { msg = JSON.parse(e.data); } catch { return; }
-      handleMessage(msg);
+      controladorMensajes(msg);
     };
 
+    //evento que ocurrirá cuando la conexión se cierre
     ws.onclose = () => {
-      setConnStatus('disconnected');
-      showOverlay('Conexión perdida. Recargá para reconectar.');
-      setStatus('', 'Desconectado');
-      disableAll();
+      estadoConexion('disconnected');
+      mostrar('Conexión perdida. Recargá para reconectar.');
+      setEstado('', 'Desconectado');
+      deshabilitarTodasLasCeldas();
+      reiniciarPuntaje();
     };
 
+    //evento que ocurrirá cuando haya algún error de comunicación
     ws.onerror = () => {
-      setConnStatus('error');
+      estadoConexion('error');
     };
   }
 
-  function send(obj) {
+  function enviar(obj) {
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify(obj));
     }
   }
 
-  function handleMessage(msg) {
+  function controladorMensajes(msg) {
+    //determina según el tipo de mensaje si:
     switch (msg.type) {
-
-      case 'waiting':
-        mySymbol = msg.symbol;
-        updateMySymbol();
-        showOverlay('Esperando al otro jugador...');
-        setStatus('', 'En sala — esperando oponente');
+      //muestra que está esperando oponentes
+      case 'esperando':
+        miSimbolo = msg.symbol;
+        verSimboloJugador();
+        mostrar('Esperando al otro jugador...');
+        setEstado('', 'En sala — esperando oponente');
         break;
 
-      case 'game_start':
-        mySymbol = msg.symbol;        // ← asignar ANTES de calcular myTurn
-        updateMySymbol();
-        hideOverlay();
-        renderBoard(msg.board);
-        myTurn   = msg.turn === mySymbol;
-        gameOver = false;
+      //en caso de que se produzcan nuevas conexiones (luego de empezar una partida) 
+      case 'sala_llena':
+        mostrar('La sala está llena. Refrescá la página una vez termine para asignarte en la partida.')
+        break;
+      //habilita las celdas para jugar, saca los otros mensajes de espera, determina el turno inicial.
+      case 'empezar':
+        miSimbolo = msg.symbol;        // ← asignar ANTES de calcular myTurn
+        verSimboloJugador();
+        ocultar();
+        renderizarTablero(msg.board);
+        miTurno   = msg.turn === miSimbolo;
+        juegoTerminado = false;
         rematchBtn.classList.remove('visible');
-        updateTurnStatus(msg.turn);
-        enableCells(msg.board);
+        verTurno(msg.turn);
+        habilitarCeldas(msg.board);
         break;
-
-      case 'state':
-        renderBoard(msg.board);
-        myTurn   = msg.turn === mySymbol;
-        gameOver = false;
-        updateTurnStatus(msg.turn);
-        enableCells(msg.board);
+      //actualiza el tablero luego de cada jugada
+      case 'estado':
+        renderizarTablero(msg.board);
+        miTurno   = msg.turn === miSimbolo;
+        juegoTerminado = false;
+        verTurno(msg.turn);
+        habilitarCeldas(msg.board);
         break;
-
-      case 'game_over':
-        renderBoard(msg.board);
-        gameOver = true;
-        myTurn   = false;
-        disableAll();
+      //fin del juego, deshabilita celdas, determina quien ganó / perdió, muestra botón de revancha
+      case 'fin_juego':
+        renderizarTablero(msg.board);
+        juegoTerminado = true;
+        miTurno   = false;
+        deshabilitarTodasLasCeldas();
         if (msg.winner) {
-          highlightWin(msg.line);
-          const isMe = msg.winner === mySymbol;
-          setStatus('win', isMe ? 'Ganaste!' : 'Perdiste...');
-          updateScore(msg.winner);
+          recibirGanador(msg.line);
+          const isMe = msg.winner === miSimbolo;
+          setEstado('win', isMe ? 'Ganaste!' : 'Perdiste...');
+          actualizarPuntaje(msg.winner);
         } else {
-          setStatus('', 'Empate');
-          updateScore(null);
+          setEstado('', 'Empate');
+          actualizarPuntaje(null);
         }
         setTimeout(() => rematchBtn.classList.add('visible'), 600);
         break;
-
+      //muestra errores  
       case 'error':
         flashError(msg.msg);
         break;
-
-      case 'opponent_left':
-        showOverlay('El oponente se fue.\nEsperando nuevo jugador...');
-        setStatus('', 'Oponente desconectado');
-        disableAll();
+      //muestra texto avisando que el rival se fue, y que se está esperando nuevo jugador  
+      case 'oponente_desconectado':
+        mostrar('El oponente se fue.\nEsperando nuevo jugador...');
+        setEstado('', 'Oponente desconectado');
+        deshabilitarTodasLasCeldas();
+        reiniciarPuntaje();
         break;
     }
   }
 
-  // ── Render ──────────────────────────────────────────
+  // ---- Renderizado ----
 
-  function renderBoard(board) {
+  function renderizarTablero(tablero) {
     cells.forEach((cell, i) => {
-      const sym = board[i];
+      const sym = tablero[i];
       const span = cell.querySelector('.cell-symbol');
+
+      //añadido
+      if (span.classList.contains('ghost')) {
+        span.textContent = '';
+        span.className = 'cell-symbol';
+      }
+
       if (sym && span.textContent !== sym) {
         span.textContent = sym;
         span.className   = `cell-symbol ${sym}`;
@@ -448,56 +475,63 @@
     });
   }
 
-  function enableCells(board) {
+  function habilitarCeldas(board) {
     cells.forEach((cell, i) => {
       cell.classList.remove('disabled');
-      if (board[i] || !myTurn) {
+      if (board[i] || !miTurno) {
         cell.classList.add('disabled');
       }
     });
   }
 
-  function disableAll() {
+  function deshabilitarTodasLasCeldas() {
     cells.forEach(c => c.classList.add('disabled'));
   }
 
-  function highlightWin(line) {
-    if (!line) return;
-    line.forEach(i => cells[i].classList.add('win-cell'));
+  function recibirGanador(linea) {
+    if (!linea) return;
+    linea.forEach(i => cells[i].classList.add('win-cell'));
   }
 
-  // ── Status ───────────────────────────────────────────
+  // ---- Estado ----
 
-  function updateTurnStatus(turn) {
-    const isMe = turn === mySymbol;
-    const sym  = turn.toLowerCase();
-    setStatus(sym, isMe ? 'Tu turno' : 'Turno del oponente');
+  function verTurno(turno) {
+    const isMe = turno === miSimbolo;
+    const sym  = turno.toLowerCase();
+    setEstado(sym, isMe ? 'Tu turno' : 'Turno del oponente');
   }
 
-  function setStatus(dotClass, text) {
+  function setEstado(dotClass, text) {
     statusDot.className = dotClass;
     statusTxt.textContent = text;
     statusTxt.className = dotClass ? 'active' : '';
   }
 
-  function updateMySymbol() {
-    if (!mySymbol) return;
-    const cls = mySymbol.toLowerCase();
-    mySymbolEl.textContent = `Jugás con ${mySymbol}`;
+  function verSimboloJugador() {
+    if (!miSimbolo) return;
+    const cls = miSimbolo.toLowerCase();
+    mySymbolEl.textContent = `Jugás con ${miSimbolo}`;
     mySymbolEl.className   = cls;
     mySymbolEl.style.display = 'block';
   }
 
-  function updateScore(winner) {
+  function actualizarPuntaje(winner) {
     let el, key;
     if (winner === 'X')     { key = 'X'; el = scoreX; }
     else if (winner === 'O') { key = 'O'; el = scoreO; }
-    else                     { key = 'tie'; el = scoreTie; }
-    score[key]++;
-    el.textContent = score[key];
+    else                     { key = 'empate'; el = scoreTie; }
+    puntaje[key]++;
+    el.textContent = puntaje[key];
     el.classList.remove('bump');
     void el.offsetWidth;
     el.classList.add('bump');
+  }
+
+  function reiniciarPuntaje() {
+      puntaje = { X: 0, O: 0, empate: 0 };
+      scoreX.textContent = '0';
+      scoreO.textContent = '0';
+      scoreTie.textContent = '0';
   }
 
   function flashError(msg) {
@@ -505,49 +539,50 @@
     statusTxt.style.color = 'var(--x-color)';
     setTimeout(() => {
       statusTxt.style.color = '';
-      updateTurnStatus(mySymbol);
+      verTurno(miSimbolo);
     }, 1500);
   }
 
-  // ── Overlay ──────────────────────────────────────────
+  // ---- Texto gráfico ----
 
-  function showOverlay(text) {
+  function mostrar(text) {
     overlayTxt.textContent = text;
     overlay.classList.remove('hidden');
   }
 
-  function hideOverlay() {
+  function ocultar() {
     overlay.classList.add('hidden');
   }
 
-  // ── Connection indicator ──────────────────────────────
+  // ---- Indicador conexión ----
 
-  function setConnStatus(s) {
+  function estadoConexion(s) {
     connDot.className = s === 'connected' ? 'connected' : s === 'error' ? 'error' : '';
     connTxt.textContent = s === 'connected' ? `conectado a ${WS_URL}` : s === 'connecting' ? 'conectando...' : s === 'error' ? 'error de conexión' : 'desconectado';
   }
 
-  // ── Interactions ──────────────────────────────────────
+  // ---- Interacciones ----
 
   cells.forEach(cell => {
     cell.addEventListener('click', () => {
-      if (cell.classList.contains('disabled') || cell.classList.contains('taken') || gameOver) return;
+      if (cell.classList.contains('disabled') || cell.classList.contains('taken') || juegoTerminado) return;
       const idx = parseInt(cell.dataset.cell);
-      send({ type: 'move', cell: idx });
+      enviar({ type: 'mov', cell: idx });
     });
 
     cell.addEventListener('mouseenter', () => {
-      if (cell.classList.contains('taken') || cell.classList.contains('disabled') || !myTurn || gameOver) return;
+      if (cell.classList.contains('taken') || cell.classList.contains('disabled') || !miTurno || juegoTerminado) return;
       const span = cell.querySelector('.cell-symbol');
       if (!span.textContent) {
-        span.textContent = mySymbol;
-        span.className   = `cell-symbol ${mySymbol} ghost`;
+        span.textContent = miSimbolo;
+        span.className   = `cell-symbol ${miSimbolo} ghost`;
       }
     });
 
     cell.addEventListener('mouseleave', () => {
       const span = cell.querySelector('.cell-symbol');
-      if (span.classList.contains('ghost')) {
+      //Segunda condición agregada
+      if (span.classList.contains('ghost') && !cell.classList.contains('taken')) {
         span.textContent = '';
         span.className   = 'cell-symbol';
       }
@@ -555,15 +590,15 @@
   });
 
   rematchBtn.addEventListener('click', () => {
-    send({ type: 'rematch' });
+    enviar({ type: 'revancha' });
     rematchBtn.classList.remove('visible');
-    setStatus('', 'Esperando revancha...');
+    setEstado('', 'Esperando revancha...');
   });
 
-  // ── Init ──────────────────────────────────────────────
+  // ---- Inicialización ----
 
-  showOverlay('Conectando al servidor...');
-  connect();
+  mostrar('Conectando al servidor...');
+  conectar();
 </script>
 </body>
 </html>
