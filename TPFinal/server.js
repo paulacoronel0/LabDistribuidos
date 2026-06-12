@@ -1,4 +1,6 @@
-//Trabajo Práctico Obligatorio 4, Lab. Prog. Distribuida, Programación Reactiva
+//Trabajo Práctico Obligatorio 4, 
+// Lab. Prog. Distribuida, 
+// Programación Reactiva
 // TATETI
 //Hecho por: Paula Coronel, Antonio Sarmiento
 
@@ -6,8 +8,8 @@ const http = require('http');
 const WebSocketServer = require('websocket').server;
 
 // ---- Servidor HTTP ----
-//Genera Servidor HTTP que responde 404 a todo. No sirve web, solo existe
-//como base para que el WS se pueda utilizar sobre el servidor. 
+//genera Servidor HTTP que responde 404 a todo. No sirve web, solo existe como base 
+//para que el WS se pueda utilizar sobre el servidor. 
 const server = http.createServer(function(request, response) {
     console.log((new Date()) + ' HTTP ' + request.url);
     response.writeHead(404);
@@ -30,14 +32,11 @@ function origenPermitido(origen) {
 }
 
 // ---- Estado global ----
-let salaActiva = null; //Controla si la sala ya está activa (limitamos solo a una sala activa el Tateti)
+let salaActiva = null; //controla si la sala ya está activa (limitamos solo a una sala activa el Tateti)
 let jugadorEsperando = null; //guarda al primer jugador que se conecta, mientras espera rival. 
-//let rooms = [];
 
 
-// Permite encontrar la sala y símbolo de cualquier conexión en O(1),
-// sin depender de closures ni de propiedades mutables en el objeto connection.
-//ver que tanto nos sirve con una sola room
+// nos permite encontrar la sala y símbolo de cualquier conexión en O(1)
 const jugadoresAceptados = new Map();
 
 // ---- Lógica del juego ----
@@ -243,10 +242,8 @@ wsServer.on('request', function(request) {
                 });
 
             }
-            //rooms = rooms.filter(r => r !== room);
             salaActiva = null;
             jugadoresAceptados.delete(conexion);
         }
-        
     });
 });

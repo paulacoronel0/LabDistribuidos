@@ -1,4 +1,11 @@
+<!-- 
+Trabajo Práctico Obligatorio 4, 
+Lab. Prog. Distribuida, 
+Programación Reactiva (RX),
+ TATETI,
+Hecho por: Paula Coronel, Antonio Sarmiento. 
 
+-->
 
 <!DOCTYPE html>
 <html lang="es">
@@ -7,10 +14,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Tateti</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Space+Mono:wght@700&display=swap');
-
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   /*CSS*/
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Space+Mono:wght@700&display=swap');
+  
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  
   :root {
     --bg:       #0f0f13;
     --surface:  #1a1a22;
@@ -316,13 +324,14 @@
   <span id="conn-text">desconectado</span>
 </div>
 
+<!--Script para la configuración de la IP Server-->
 <script src="config.js"></script>
 
 <script>
   
   /*Parte JScript*/
   const WS_URL = `ws://${CONFIG.SERVER_IP}:${CONFIG.WS_PORT}`
-  //const WS_URL = 'ws://localhost:8080';
+  
 
   const cells      = document.querySelectorAll('.cell');
   const overlay    = document.getElementById('overlay');
@@ -399,7 +408,7 @@
         break;
       //habilita las celdas para jugar, saca los otros mensajes de espera, determina el turno inicial.
       case 'empezar':
-        miSimbolo = msg.symbol;        // ← asignar ANTES de calcular myTurn
+        miSimbolo = msg.symbol;        // asignar ANTES de calcular miTurno
         verSimboloJugador();
         ocultar();
         renderizarTablero(msg.board);
@@ -455,7 +464,6 @@
       const sym = tablero[i];
       const span = cell.querySelector('.cell-symbol');
 
-      //añadido
       if (span.classList.contains('ghost')) {
         span.textContent = '';
         span.className = 'cell-symbol';
@@ -566,8 +574,8 @@
   cells.forEach(cell => {
     cell.addEventListener('click', () => {
       if (cell.classList.contains('disabled') || cell.classList.contains('taken') || juegoTerminado) return;
-      const idx = parseInt(cell.dataset.cell);
-      enviar({ type: 'mov', cell: idx });
+      const pos = parseInt(cell.dataset.cell);
+      enviar({ type: 'mov', cell: pos });
     });
 
     cell.addEventListener('mouseenter', () => {
@@ -581,7 +589,7 @@
 
     cell.addEventListener('mouseleave', () => {
       const span = cell.querySelector('.cell-symbol');
-      //Segunda condición agregada
+      
       if (span.classList.contains('ghost') && !cell.classList.contains('taken')) {
         span.textContent = '';
         span.className   = 'cell-symbol';
